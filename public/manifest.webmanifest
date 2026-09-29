@@ -1,0 +1,30 @@
+{
+  "name": "CPNS Lab — Simulasi & Belajar Tes CPNS",
+  "short_name": "CPNS Lab",
+  "description": "Simulasi dan pembelajaran tes CPNS: TWK, TIU, TKP dengan pembahasan, statistik, dan tutor AI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "lang": "id",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
