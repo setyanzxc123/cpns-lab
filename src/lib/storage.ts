@@ -86,4 +86,25 @@ export const localStore = {
   getAllAiExplanations(): Record<string, string> {
     return read<Record<string, string>>(K_EXPLAIN_CACHE, {});
   },
+  hasGuestData(): boolean {
+    const results = localStore.getResults();
+    const wrong = localStore.getWrong();
+    const custom = localStore.getCustomQuestions();
+    return results.length > 0 || Object.keys(wrong).length > 0 || custom.length > 0;
+  },
+  clearGuestData(): void {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(K_RESULTS);
+    window.localStorage.removeItem(K_WRONG);
+    window.localStorage.removeItem(K_CUSTOM);
+  },
+  getLastSync(): string | null {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("cpns.lastSync");
+  },
+  setLastSync(iso: string): void {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("cpns.lastSync", iso);
+  },
 };
+

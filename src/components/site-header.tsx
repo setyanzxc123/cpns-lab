@@ -16,7 +16,24 @@ import {
 } from "@/components/ui/dialog";
 import { supabaseConfigured, createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { GraduationCap, LayoutDashboard, Timer, BookOpen, BarChart3, Library, Bot, LogIn, LogOut, Loader2 } from "lucide-react";
+import {
+  GraduationCap,
+  LayoutDashboard,
+  Timer,
+  BookOpen,
+  BarChart3,
+  Library,
+  Bot,
+  LogIn,
+  LogOut,
+  Loader2,
+  Cloud,
+  HardDrive,
+  RefreshCw,
+} from "lucide-react";
+import { toast } from "sonner";
+import { syncGuestToCloud } from "@/lib/sync";
+import { localStore } from "@/lib/storage";
 
 const NAV = [
   { href: "/", label: "Beranda", icon: LayoutDashboard },
@@ -31,18 +48,64 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [user, setUser] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     if (!supabaseConfigured()) return;
     const sb = createClient();
-    sb.auth.getUser().then(({ data }) => setUser(data.user?.email ?? null));
+
+    async function checkAndSync(userEmail: string | null) {
+      setUser(userEmail);
+      if (userEmail && localStore.hasGuestData()) {
+        setSyncing(true);
+        try {
+          const res = await syncGuestToCloud();
+          if (res.success && (res.sessionsCount > 0 || res.customCount > 0)) {
+            toast.success(
+              `Data sesi tamu berhasil disinkronkan ke cloud: ${res.sessionsCount} sesi, ${res.customCount} soal kustom.`,
+            );
+          }
+        } catch {
+          // Keep local data safe on failure
+        } finally {
+          setSyncing(false);
+        }
+      }
+    }
+
+    sb.auth.getUser().then(({ data }) => {
+      void checkAndSync(data.user?.email ?? null);
+    });
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user?.email ?? null);
+      void checkAndSync(session?.user?.email ?? null);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  async function handleManualSync() {
+    if (syncing || !user) return;
+    setSyncing(true);
+    try {
+      const res = await syncGuestToCloud();
+      if (res.success) {
+        if (res.sessionsCount > 0 || res.customCount > 0) {
+          toast.success(
+            `Data berhasil disinkronkan: ${res.sessionsCount} sesi, ${res.customCount} soal kustom.`,
+          );
+        } else {
+          toast.info("Semua data lokal telah tersinkronisasi ke cloud.");
+        }
+      } else if (res.message) {
+        toast.info(res.message);
+      }
+    } catch {
+      toast.error("Gagal menyinkronkan data ke cloud.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function signInEmail(formData: FormData) {
     const email = String(formData.get("email") ?? "");
@@ -50,7 +113,14 @@ export function SiteHeader() {
     setBusy(true);
     try {
       const sb = createClient();
-      await sb.auth.signInWithPassword({ email, password });
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success("Berhasil masuk.");
+      }
+    } catch {
+      toast.error("Gagal masuk. Periksa koneksi Anda.");
     } finally {
       setBusy(false);
     }
@@ -62,7 +132,14 @@ export function SiteHeader() {
     setBusy(true);
     try {
       const sb = createClient();
-      await sb.auth.signUp({ email, password });
+      const { error } = await sb.auth.signUp({ email, password });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success("Pendaftaran berhasil. Silakan periksa email untuk konfirmasi.");
+      }
+    } catch {
+      toast.error("Gagal mendaftar. Periksa koneksi Anda.");
     } finally {
       setBusy(false);
     }
@@ -101,6 +178,32 @@ export function SiteHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <ThemeToggle />
+          {mounted && (
+            user ? (
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={syncing}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                title="Tersinkronisasi ke cloud. Klik untuk sinkronisasi manual."
+              >
+                {syncing ? (
+                  <RefreshCw className="h-3 w-3 animate-spin text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Cloud className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                )}
+                <span>{syncing ? "Sinkronisasi..." : "Cloud"}</span>
+              </button>
+            ) : (
+              <div
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-muted bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+                title="Data tersimpan di browser ini (Mode Tamu)"
+              >
+                <HardDrive className="h-3 w-3" />
+                <span>Mode Tamu</span>
+              </div>
+            )
+          )}
           {mounted && supabaseConfigured() ? (
             user ? (
               <>
@@ -111,6 +214,8 @@ export function SiteHeader() {
                   onClick={async () => {
                     const sb = createClient();
                     await sb.auth.signOut();
+                    setUser(null);
+                    toast.info("Anda telah keluar.");
                   }}
                 >
                   <LogOut className="h-4 w-4" />
@@ -130,7 +235,7 @@ export function SiteHeader() {
                   <DialogHeader>
                     <DialogTitle>Masuk ke CPNS Lab</DialogTitle>
                     <DialogDescription>
-                      Riwayat &amp; progres tersinkron antar perangkat via Supabase.
+                      Riwayat &amp; progres tersinkron antar perangkat via Supabase. Data sesi tamu di perangkat ini akan otomatis disinkronkan ke akun Anda saat masuk.
                     </DialogDescription>
                   </DialogHeader>
                   <Button variant="outline" onClick={signInGoogle} className="w-full">

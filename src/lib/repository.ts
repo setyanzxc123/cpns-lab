@@ -6,6 +6,9 @@
 import type { Question, SessionResult } from "./types";
 import { localStore } from "./storage";
 import { createClient } from "@/lib/supabase/client";
+import { syncGuestToCloud } from "./sync";
+
+export { syncGuestToCloud };
 
 export interface Repository {
   listResults(): Promise<SessionResult[]>;
@@ -17,7 +20,7 @@ export interface Repository {
   saveCustomQuestions(qs: Question[]): Promise<void>;
 }
 
-// ---------- Lokal (tamu) ----------
+// Local guest repository
 
 export const localRepo: Repository = {
   async listResults() {
@@ -43,7 +46,7 @@ export const localRepo: Repository = {
   },
 };
 
-// ---------- Supabase (user login) ----------
+// Supabase authenticated repository
 
 class SupabaseRepo implements Repository {
   async listResults(): Promise<SessionResult[]> {
@@ -105,16 +108,21 @@ class SupabaseRepo implements Repository {
   }
 }
 
-/** Pilih repo aktif: Supabase jika user sudah login, selain itu lokal. */
+/** Select active repository: Supabase if user is logged in, otherwise local. */
 export async function getRepo(): Promise<Repository> {
   try {
     if (supabaseConfiguredClient()) {
       const sb = createClient();
       const { data } = await sb.auth.getUser();
-      if (data.user) return new SupabaseRepo();
+      if (data.user) {
+        if (localStore.hasGuestData()) {
+          void syncGuestToCloud().catch(() => {});
+        }
+        return new SupabaseRepo();
+      }
     }
   } catch {
-    // env Supabase tidak lengkap — jatuh ke mode lokal
+    // Fall back to local mode if Supabase credentials are missing or network fails
   }
   return localRepo;
 }
