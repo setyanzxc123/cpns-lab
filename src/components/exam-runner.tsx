@@ -37,6 +37,8 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
   const [choices, setChoices] = useState<Record<string, number | null>>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [current, setCurrent] = useState(0);
+  const [timeSpent, setTimeSpent] = useState<Record<string, number>>({});
+  const [currentQuestionSec, setCurrentQuestionSec] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [startedAt, setStartedAt] = useState<number>(() => Date.now());
   const [endsAt, setEndsAt] = useState<number | null>(() =>
@@ -44,6 +46,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
   );
   const finishedRef = useRef(false);
   const persistedRef = useRef(false);
+  const questionEnteredAtRef = useRef<number>(0);
 
   useEffect(() => {
     const saved = localStore.getRunning() as RunningExam | null;
@@ -62,7 +65,10 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
         setQuestions(qs);
         setChoices(saved.choices || {});
         setFlags(saved.flags || {});
-        setCurrent(Math.min(saved.currentIndex || 0, qs.length - 1));
+        const restoredIdx = Math.min(saved.currentIndex || 0, qs.length - 1);
+        setCurrent(restoredIdx);
+        setTimeSpent(saved.timeSpent || {});
+        questionEnteredAtRef.current = Date.now();
         setStartedAt(saved.startedAt);
         setEndsAt(saved.endsAt);
         return;
@@ -75,8 +81,46 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
     setStartedAt(now);
     setEndsAt(newEndsAt);
     setQuestions(qs);
+    questionEnteredAtRef.current = now;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Update live counter per detik untuk soal yang sedang aktif
+  useEffect(() => {
+    if (finishedRef.current) return;
+    const tick = () => {
+      const enteredAt = questionEnteredAtRef.current || Date.now();
+      const delta = Math.max(0, Math.floor((Date.now() - enteredAt) / 1000));
+      const curQid = questions && questions[current] ? questions[current].id : null;
+      const base = curQid ? timeSpent[curQid] ?? 0 : 0;
+      setCurrentQuestionSec(base + delta);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [questions, current, timeSpent]);
+
+  const changeCurrentIndex = useCallback(
+    (nextIndex: number) => {
+      if (!questions || !questions[current]) return;
+      const now = Date.now();
+      const enteredAt = questionEnteredAtRef.current || now;
+      const deltaSec = Math.max(0, Math.round((now - enteredAt) / 1000));
+      questionEnteredAtRef.current = now;
+      const curQid = questions[current].id;
+
+      setTimeSpent((prev) => ({
+        ...prev,
+        [curQid]: (prev[curQid] ?? 0) + deltaSec,
+      }));
+
+      setCurrent(nextIndex);
+      const nextQid = questions[nextIndex]?.id;
+      const baseForNext = nextQid ? timeSpent[nextQid] ?? 0 : 0;
+      setCurrentQuestionSec(baseForNext);
+    },
+    [questions, current, timeSpent],
+  );
 
   const answeredCount = questions ? questions.filter((q) => choices[q.id] != null).length : 0;
 
@@ -84,7 +128,28 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
     async (auto = false) => {
       if (!questions || finishedRef.current) return;
       finishedRef.current = true;
-      const { answers, subScores, totalScore, maxScore } = computeSubScores(questions, choices);
+
+      // Akumulasikan detik pengerjaan di soal yang sedang dibuka sebelum disubmit
+      const now = Date.now();
+      const enteredAt = questionEnteredAtRef.current || now;
+      const deltaSec = Math.max(0, Math.round((now - enteredAt) / 1000));
+      const curQid = questions[current]?.id;
+      const finalTimeSpent = {
+        ...timeSpent,
+        ...(curQid ? { [curQid]: (timeSpent[curQid] ?? 0) + deltaSec } : {}),
+      };
+
+      const {
+        answers,
+        subScores,
+        totalScore,
+        maxScore,
+        passed,
+        passingGradeSummary,
+        avgTimePerQuestionSec,
+        pacingStats,
+      } = computeSubScores(questions, choices, finalTimeSpent, config.mode);
+
       const finishedAt = Date.now();
       const result: SessionResult = {
         id: `S-${finishedAt}`,
@@ -97,6 +162,10 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
         subScores,
         totalScore,
         maxScore,
+        passed,
+        passingGradeSummary,
+        avgTimePerQuestionSec,
+        pacingStats,
       };
       localStore.clearRunning();
       const { getRepo } = await import("@/lib/repository");
@@ -107,7 +176,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
       }
       await onFinished(result);
     },
-    [questions, choices, config, startedAt, onFinished],
+    [questions, choices, timeSpent, current, config, startedAt, onFinished],
   );
 
   const left = useCountdown(endsAt, () => void finish(true));
@@ -124,8 +193,9 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
       startedAt,
       endsAt,
       currentIndex: current,
+      timeSpent,
     });
-  }, [questions, choices, flags, startedAt, endsAt, current, config]);
+  }, [questions, choices, flags, startedAt, endsAt, current, config, timeSpent]);
 
   if (!questions) {
     return <p className="text-center text-muted-foreground">Menyiapkan soal…</p>;
@@ -204,7 +274,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
               return (
                 <button
                   key={qq.id}
-                  onClick={() => setCurrent(i)}
+                  onClick={() => changeCurrentIndex(i)}
                   className={`h-8 w-8 rounded text-xs font-semibold transition-colors ${
                     i === current
                       ? "bg-primary text-primary-foreground ring-2 ring-offset-1 ring-primary"
@@ -231,6 +301,25 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
               <span className="ml-2 text-xs text-muted-foreground">{q.sub}</span>
             </div>
             <div className="flex items-center gap-2">
+              {/* Indikator pacing waktu soal ini */}
+              <div
+                className={`flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-xs transition-colors ${
+                  currentQuestionSec > 90
+                    ? "bg-red-100 font-semibold text-red-700 dark:bg-red-950/70 dark:text-red-400"
+                    : currentQuestionSec > 54
+                      ? "bg-amber-100 font-medium text-amber-700 dark:bg-amber-950/70 dark:text-amber-400"
+                      : "bg-muted text-muted-foreground"
+                }`}
+                title={
+                  currentQuestionSec > 90
+                    ? "Waspada: Pengerjaan soal ini sudah >90 detik! Target BKN rata-rata 54 detik."
+                    : "Durasi pada nomor soal ini"
+                }
+              >
+                <Clock className="h-3 w-3" />
+                <span>{formatTime(currentQuestionSec)}</span>
+                {currentQuestionSec > 90 && <span className="font-sans text-[10px] font-bold">⚠️</span>}
+              </div>
               <span className="text-sm font-semibold text-muted-foreground">
                 No. {current + 1}
               </span>
@@ -319,15 +408,15 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
 
       {/* Kontrol */}
       <div className="flex items-center justify-between gap-2">
-        <Button variant="outline" onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0}>
+        <Button variant="outline" onClick={() => changeCurrentIndex(Math.max(0, current - 1))} disabled={current === 0}>
           <ChevronLeft className="h-4 w-4" /> Sebelumnya
         </Button>
         {config.mode === "latihan" && chosen !== null && current < questions.length - 1 ? (
-          <Button onClick={() => setCurrent((c) => c + 1)}>Soal berikutnya</Button>
+          <Button onClick={() => changeCurrentIndex(current + 1)}>Soal berikutnya</Button>
         ) : current === questions.length - 1 ? (
           <Button onClick={() => setConfirmOpen(true)}>Selesai &amp; Lihat Hasil</Button>
         ) : (
-          <Button variant="outline" onClick={() => setCurrent((c) => c + 1)}>
+          <Button variant="outline" onClick={() => changeCurrentIndex(current + 1)}>
             Berikutnya <ChevronRight className="h-4 w-4" />
           </Button>
         )}

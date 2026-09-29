@@ -160,12 +160,28 @@ export default function StatistikPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {r.passingGradeSummary && (
+                    <Badge
+                      className={
+                        r.passed
+                          ? "bg-emerald-600 text-white"
+                          : "bg-rose-600 text-white"
+                      }
+                    >
+                      {r.passed ? "Lulus PG" : "TMS"}
+                    </Badge>
+                  )}
+                  {r.avgTimePerQuestionSec != null && (
+                    <span className="text-xs font-mono text-muted-foreground hidden sm:inline">
+                      ⏱️ {r.avgTimePerQuestionSec}s/soal
+                    </span>
+                  )}
                   {r.subScores.map((s) => (
                     <Badge key={s.category} variant="outline">
                       {s.category} {s.score}/{s.maxScore}
                     </Badge>
                   ))}
-                  <Badge className={pct >= 60 ? "bg-green-600" : "bg-amber-600"}>{pct}%</Badge>
+                  <Badge className={pct >= 60 ? "bg-emerald-600" : "bg-amber-600"}>{pct}%</Badge>
                 </div>
               </div>
             );

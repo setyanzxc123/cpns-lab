@@ -4,14 +4,19 @@
 // penilaian, persistensi sesi berjalan agar bisa dilanjutkan).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  Category,
-  ExamConfig,
-  Question,
-  RunningExam,
-  SessionAnswer,
-  SessionResult,
-  SubScore,
+import {
+  BKN_BENCHMARK_PACE_SEC,
+  BKN_MAX_SCORE,
+  BKN_PASSING_GRADE,
+  type Category,
+  type ExamConfig,
+  type PacingStats,
+  type PassingGradeSummary,
+  type Question,
+  type RunningExam,
+  type SessionAnswer,
+  type SessionResult,
+  type SubScore,
 } from "@/lib/types";
 import { sampleQuestions } from "@/data/bank";
 import { localStore } from "@/lib/storage";
@@ -24,6 +29,7 @@ interface ExamState {
   startedAt: number;
   endsAt: number | null;
   currentIndex: number;
+  timeSpent: Record<string, number>;
 }
 
 function questionValue(q: Question, choice: number | null): { value: number; correct: boolean | null } {
@@ -36,21 +42,38 @@ function questionValue(q: Question, choice: number | null): { value: number; cor
   return { value: ok ? 5 : 0, correct: ok };
 }
 
-export function computeSubScores(questions: Question[], choices: Record<string, number | null>): {
+export function computeSubScores(
+  questions: Question[],
+  choices: Record<string, number | null>,
+  timeSpent?: Record<string, number>,
+  mode: "simulasi" | "latihan" = "simulasi",
+): {
   subScores: SubScore[];
   answers: SessionAnswer[];
   totalScore: number;
   maxScore: number;
+  passed?: boolean;
+  passingGradeSummary?: PassingGradeSummary;
+  avgTimePerQuestionSec?: number;
+  pacingStats?: PacingStats;
 } {
   const byCat = new Map<Category, SubScore>();
   const answers: SessionAnswer[] = [];
   let totalScore = 0;
   let maxScore = 0;
+
   for (const q of questions) {
     const { value, correct } = questionValue(q, choices[q.id] ?? null);
-    answers.push({ questionId: q.id, choice: choices[q.id] ?? null, correct, value });
+    const spentSec = timeSpent && timeSpent[q.id] != null ? Math.max(0, Math.round(timeSpent[q.id])) : undefined;
+    answers.push({
+      questionId: q.id,
+      choice: choices[q.id] ?? null,
+      correct,
+      value,
+      timeSpentSec: spentSec,
+    });
     totalScore += value;
-    const max = q.category === "TKP" ? 5 : 5;
+    const max = 5;
     maxScore += max;
     const cur = byCat.get(q.category) ?? {
       category: q.category,
@@ -65,7 +88,85 @@ export function computeSubScores(questions: Question[], choices: Record<string, 
     cur.maxScore += max;
     byCat.set(q.category, cur);
   }
-  return { subScores: [...byCat.values()], answers, totalScore, maxScore };
+
+  // Hitung Nilai Ambang Batas (Passing Grade) per subtes
+  const subScores: SubScore[] = [];
+  for (const [cat, cur] of byCat.entries()) {
+    let pg = BKN_PASSING_GRADE[cat];
+    const isStandardCount =
+      (cat === "TWK" && cur.total === 30) ||
+      (cat === "TIU" && cur.total === 35) ||
+      (cat === "TKP" && (cur.total === 45 || cur.total === 40));
+
+    // Jika jumlah soal tidak standar (mis. paket mini / custom), skala ambang batas proporsional
+    if (!isStandardCount && cur.maxScore > 0) {
+      pg = Math.round((cur.maxScore / BKN_MAX_SCORE[cat]) * BKN_PASSING_GRADE[cat]);
+    }
+
+    cur.passingGrade = pg;
+    cur.passed = cur.score >= pg;
+    subScores.push(cur);
+  }
+
+  // Ringkasan status kelulusan passing grade BKN
+  const twkCount = byCat.get("TWK")?.total ?? 0;
+  const tiuCount = byCat.get("TIU")?.total ?? 0;
+  const tkpCount = byCat.get("TKP")?.total ?? 0;
+  const isFullPackage = twkCount === 30 && tiuCount === 35 && (tkpCount === 45 || tkpCount === 40);
+  const allPassed = subScores.length > 0 && subScores.every((s) => s.passed);
+  const failedCategories = subScores.filter((s) => !s.passed).map((s) => s.category);
+  const totalPassingGrade = subScores.reduce((acc, s) => acc + (s.passingGrade ?? 0), 0);
+
+  const passingGradeSummary: PassingGradeSummary = {
+    isFullPackage,
+    allPassed,
+    totalPassingGrade,
+    failedCategories,
+  };
+
+  // Pacing analytics
+  let pacingStats: PacingStats | undefined = undefined;
+  let avgTimePerQuestionSec: number | undefined = undefined;
+
+  if (timeSpent && questions.length > 0) {
+    const spentList = questions.map((q) => timeSpent[q.id] ?? 0);
+    const totalSpent = spentList.reduce((acc, v) => acc + v, 0);
+    const avgSec = Math.round(totalSpent / questions.length);
+    avgTimePerQuestionSec = avgSec;
+
+    let fastCount = 0;
+    let normalCount = 0;
+    let slowCount = 0;
+    let trapCount = 0;
+
+    for (const sec of spentList) {
+      if (sec <= 0) continue;
+      if (sec < 45) fastCount++;
+      else if (sec <= 90) normalCount++;
+      else if (sec <= 120) slowCount++;
+      else trapCount++;
+    }
+
+    pacingStats = {
+      avgTimeSec: avgSec,
+      benchmarkSec: BKN_BENCHMARK_PACE_SEC,
+      fastQuestionsCount: fastCount,
+      normalQuestionsCount: normalCount,
+      slowQuestionsCount: slowCount,
+      timeTrapsCount: trapCount,
+    };
+  }
+
+  return {
+    subScores,
+    answers,
+    totalScore,
+    maxScore,
+    passed: mode === "simulasi" ? allPassed : undefined,
+    passingGradeSummary,
+    avgTimePerQuestionSec,
+    pacingStats,
+  };
 }
 
 export function useExam(bank: Question[]) {
@@ -99,6 +200,7 @@ export function useExam(bank: Question[]) {
       startedAt: saved.startedAt,
       endsAt: saved.endsAt,
       currentIndex: saved.currentIndex,
+      timeSpent: saved.timeSpent || {},
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bank.length === 0]);
@@ -116,6 +218,7 @@ export function useExam(bank: Question[]) {
       startedAt: state.startedAt,
       endsAt: state.endsAt,
       currentIndex: state.currentIndex,
+      timeSpent: state.timeSpent,
     };
     localStore.saveRunning(running);
   }, []);
@@ -132,6 +235,7 @@ export function useExam(bank: Question[]) {
         startedAt: Date.now(),
         endsAt: config.durationSec > 0 ? Date.now() + config.durationSec * 1000 : null,
         currentIndex: 0,
+        timeSpent: {},
       };
       setExam(state);
       persist(state);
@@ -181,10 +285,8 @@ export function useExam(bank: Question[]) {
 
   const finish = useCallback(async (): Promise<SessionResult | null> => {
     if (!exam) return null;
-    const { subScores, answers, totalScore, maxScore } = computeSubScores(
-      exam.questions,
-      exam.choices,
-    );
+    const { subScores, answers, totalScore, maxScore, passed, passingGradeSummary, avgTimePerQuestionSec, pacingStats } =
+      computeSubScores(exam.questions, exam.choices, exam.timeSpent, exam.config.mode);
     const finishedAt = Date.now();
     const result: SessionResult = {
       id: `S-${finishedAt}`,
@@ -197,6 +299,10 @@ export function useExam(bank: Question[]) {
       subScores,
       totalScore,
       maxScore,
+      passed,
+      passingGradeSummary,
+      avgTimePerQuestionSec,
+      pacingStats,
     };
     setExam(null);
     persist(null);

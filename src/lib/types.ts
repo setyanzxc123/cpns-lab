@@ -2,6 +2,23 @@
 
 export type Category = "TWK" | "TIU" | "TKP";
 
+/** Nilai Ambang Batas (Passing Grade) resmi BKN sesuai KepmenPAN-RB (SKD Standar 110 soal) */
+export const BKN_PASSING_GRADE: Record<Category, number> = {
+  TWK: 65,
+  TIU: 80,
+  TKP: 166,
+};
+
+/** Skor maksimum resmi BKN per subtes */
+export const BKN_MAX_SCORE: Record<Category, number> = {
+  TWK: 150, // 30 soal x 5
+  TIU: 175, // 35 soal x 5
+  TKP: 225, // 45 soal x 5
+};
+
+/** Benchmark waktu pengerjaan resmi CAT BKN (100 menit / 110 soal ≈ 54.5 detik/soal) */
+export const BKN_BENCHMARK_PACE_SEC = 54;
+
 export type SubCategory =
   // TWK
   | "Pancasila"
@@ -75,6 +92,10 @@ export interface SubScore {
   /** skor mentah (TWK/TIU: 5 per benar; TKP: 1-5 per soal) */
   score: number;
   maxScore: number;
+  /** Nilai Ambang Batas BKN atau ambang batas proporsional */
+  passingGrade?: number;
+  /** Apakah subtes ini melampaui nilai ambang batas */
+  passed?: boolean;
 }
 
 export interface SessionAnswer {
@@ -85,6 +106,34 @@ export interface SessionAnswer {
   correct: boolean | null;
   /** nilai yang diperoleh untuk soal ini */
   value: number;
+  /** Durasi pengerjaan soal ini dalam satuan detik */
+  timeSpentSec?: number;
+}
+
+export interface PassingGradeSummary {
+  /** True jika menggunakan paket standar BKN penuh (30 TWK, 35 TIU, 40-45 TKP) */
+  isFullPackage: boolean;
+  /** True jika SEMUA subtes memenuhi atau melampaui nilai ambang batas */
+  allPassed: boolean;
+  /** Total ambang batas kumulatif */
+  totalPassingGrade: number;
+  /** Daftar subtes yang gagal memenuhi ambang batas */
+  failedCategories: Category[];
+}
+
+export interface PacingStats {
+  /** Rata-rata detik per soal */
+  avgTimeSec: number;
+  /** Benchmark resmi BKN (~54s) */
+  benchmarkSec: number;
+  /** Jumlah soal cepat (< 45s) */
+  fastQuestionsCount: number;
+  /** Jumlah soal standar/aman (45s - 90s) */
+  normalQuestionsCount: number;
+  /** Jumlah soal lambat / rawan (> 90s dan <= 120s) */
+  slowQuestionsCount: number;
+  /** Jumlah soal jebakan waktu / time-trap kritis (> 120s) */
+  timeTrapsCount: number;
 }
 
 export interface SessionResult {
@@ -99,6 +148,13 @@ export interface SessionResult {
   subScores: SubScore[];
   totalScore: number;
   maxScore: number;
+  /** Status kelulusan nilai ambang batas secara keseluruhan */
+  passed?: boolean;
+  passingGradeSummary?: PassingGradeSummary;
+  /** Rata-rata waktu pengerjaan per soal dalam detik */
+  avgTimePerQuestionSec?: number;
+  /** Analisis pacing waktu pengerjaan */
+  pacingStats?: PacingStats;
 }
 
 export interface ExamConfig {
@@ -123,4 +179,7 @@ export interface RunningExam {
   startedAt: number;
   endsAt: number | null; // epoch ms, null = tanpa waktu
   currentIndex: number;
+  /** Akumulasi durasi per soal (dalam detik) */
+  timeSpent?: Record<string, number>;
 }
+
