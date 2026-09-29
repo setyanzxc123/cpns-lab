@@ -25,6 +25,9 @@ export type SubCategory =
   | "UUD 1945"
   | "Bhinneka Tunggal Ika"
   | "NKRI"
+  | "Nasionalisme"
+  | "Gagasan Utama"
+  | "Kalimat Efektif"
   | "Integritas"
   | "Bela Negara"
   // TIU
@@ -40,34 +43,41 @@ export type SubCategory =
   | "Profesionalisme"
   | "Anti Radikalisme";
 
-/** Spesifikasi deklaratif untuk soal figural yang dirender sebagai SVG. */
-export type VisualSpec =
-  | {
-      /** Deretan N bangun yang dirotasi bertahap, satu panel ditandai "?" */
-      kind: "shape-series";
-      shape: ShapeName;
-      count: number;
-      /** index panel yang digantikan "?" (0-based) */
-      missing: number;
-      /** besar rotasi per langkah (derajat) */
-      rotationStep: number;
-      /** jumlah titik kecil di bawah bangun, bertambah tiap langkah */
-      dots?: { start: number; step: number };
-    }
-  | {
-      /** Satu bangun untuk pilihan jawaban figural */
-      kind: "shape-single";
-      shape: ShapeName;
-      rotation?: number;
-      flipH?: boolean;
-      dots?: number;
-    };
+/** Mode pengisian bentuk: penuh, garis tepi saja, atau arsiran diagonal. */
+export type Fill = "solid" | "outline" | "hatch";
 
-export type ShapeName = "arrow" | "triangle" | "star" | "square" | "pentagon" | "flag";
+/** Satu primitif gambar di dalam sel (ruang koordinat 100x100). */
+export type Shape =
+  | { polyRect: [number, number][]; fill: Fill }
+  | { circle: { r: number; fill: Fill } }
+  | { spikes: { k: number; rOut: number; rIn: number; rot?: number; fill: Fill } }
+  | { zigzag: { peaks: number; amp: number } }
+  | { dots: { cols: number; rows: number; gap: number; r: number } }
+  | { arrow: { rot?: number } }
+  | { letter: string }
+  | { image: string };
+
+/** Komposisi primitif dalam satu sel, opsional dengan bingkai (double = bingkai ganda). */
+export interface Glyph {
+  shapes: Shape[];
+  frame?: { double?: boolean };
+}
+
+/**
+ * Spesifikasi visual soal figural — mencakup 4 pola umum:
+ * deret (serial), analogi gambar, odd-one-out, dan jaring-jaring/lipatan.
+ */
+export type VisualSpec =
+  | { kind: "series"; cells: (Glyph | "?")[] }
+  | { kind: "analogy"; cells: [Glyph, Glyph, Glyph, Glyph | "?"] }
+  | { kind: "odd-five"; cells: Glyph[] }
+  | { kind: "net"; cells: (Glyph | null)[]; cols: number }
+  | { kind: "grid-9"; cells: (Glyph | "?")[] };
 
 export interface QuestionOption {
   text?: string;
-  visual?: VisualSpec;
+  /** Opsi jawaban berupa gambar: satu Glyph (tanpa pembungkus kind). */
+  visual?: Glyph;
 }
 
 export interface Question {

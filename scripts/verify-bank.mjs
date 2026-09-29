@@ -7,9 +7,9 @@
 const VALID_SHAPES = new Set(["arrow", "triangle", "star", "square", "pentagon", "flag"]);
 
 const VALID_SUBS = {
-  TWK: new Set(["Pancasila", "UUD 1945", "Bhinneka Tunggal Ika", "NKRI", "Integritas", "Bela Negara", "Anti Radikalisme"]),
-  TIU: new Set(["Verbal", "Numerik", "Figural", "Logika"]),
-  TKP: new Set(["Pelayanan Publik", "Jejaring Kerja", "Sosial Budaya", "Teknologi Informasi", "Profesionalisme", "Anti Radikalisme"]),
+  TWK: new Set(["Pancasila", "UUD 1945", "Bhinneka Tunggal Ika", "NKRI", "Nasionalisme", "Gagasan Utama", "Kalimat Efektif", "Integritas", "Bela Negara", "Anti Radikalisme"]),
+  TIU: new Set(["Verbal", "Numerik", "Figural", "Logika", "Pecahan dan Desimal", "Hubungan X dan Y", "Analogi Kata dan Kalimat", "Pola Kalimat", "Silogisme", "Pola Bilangan", "Perbandingan Senilai dan Tak Senilai", "Figural 9 Kotak", "Figural", "Penalaran Analitis", "Tabel"]),
+  TKP: new Set(["Pelayanan Publik", "Profesionalisme", "Jejaring Kerja", "Teknologi Informasi", "Teknologi Informasi dan Komunikasi", "Sosial Budaya", "Anti Radikalisme"]),
 };
 
 const BKN_TARGET_QUOTA = {
@@ -29,16 +29,30 @@ async function run() {
   console.log("   CPNS LAB - SUITE VERIFIKASI BANK SOAL OTOMATIS");
   console.log("========================================================\n");
 
-  const [twkMod, tiuMod, tkpMod] = await Promise.all([
+  const [twkMod, tiuMod, tkpMod, fs] = await Promise.all([
     import("../src/data/questions-twk.ts"),
     import("../src/data/questions-tiu.ts"),
     import("../src/data/questions-tkp.ts"),
+    import("node:fs"),
+    import("node:path"),
   ]);
+  const fsSync = (await import("node:fs")).default;
+  const path = (await import("node:path")).default;
+
+  const extractedDir = path.resolve("src/data/extracted");
+  const batchFiles = fsSync.existsSync(extractedDir)
+    ? fsSync.readdirSync(extractedDir).filter((f) => f.startsWith("batch-") && f.endsWith(".json"))
+    : [];
+
+  const batchQuestions = batchFiles.flatMap((f) =>
+    JSON.parse(fsSync.readFileSync(path.join(extractedDir, f), "utf8")),
+  );
 
   const allQuestions = [
     ...twkMod.twkQuestions,
     ...tiuMod.tiuQuestions,
     ...tkpMod.tkpQuestions,
+    ...batchQuestions,
   ];
 
   console.log(`Memuat ${allQuestions.length} butir soal dari bank data...\n`);
@@ -135,47 +149,99 @@ async function run() {
       }
     }
 
-    // 7. VERIFIKASI MATEMATIS GEOMETRIS UNTUK FIGURAL (VISUAL SPEC)
+    // 7. VERIFIKASI VISUAL FIGURAL (SPEC VEKTOR BARU)
     if (q.visual) {
-      if (q.visual.kind === "shape-series") {
-        const { shape, count, missing, rotationStep, dots } = q.visual;
-
-        if (!VALID_SHAPES.has(shape)) {
-          errors.push(`${prefix} [VISUAL] Bangun '${shape}' tidak terdaftar dalam valid shapes.`);
-        }
-        if (typeof count !== "number" || count < 3) {
-          errors.push(`${prefix} [VISUAL] Deret bangun 'count' minimal 3, ditemukan: ${count}.`);
-        }
-        if (typeof missing !== "number" || missing < 0 || missing >= count) {
-          errors.push(`${prefix} [VISUAL] Index panel hilang 'missing' (${missing}) di luar batas (0..${count - 1}).`);
-        }
-
-        // Hitung ekspektasi geometris secara deterministik
-        const expectedAngle = normalizeDeg(missing * rotationStep);
-        let expectedDots = undefined;
-        if (dots) {
-          expectedDots = dots.start + dots.step * missing;
-        }
-
-        // Verifikasi bahwa opsi jawaban yang dinyatakan 'answer' cocok dengan perhitungan matematis
-        if (typeof q.answer === "number" && q.options && q.options[q.answer]) {
-          const correctOpt = q.options[q.answer];
-          if (!correctOpt.visual || correctOpt.visual.kind !== "shape-single") {
-            errors.push(`${prefix} [VISUAL] Kunci jawaban [${q.answer}] tidak memiliki visual bertipe 'shape-single'.`);
-          } else {
-            const v = correctOpt.visual;
-            if (v.shape !== shape) {
-              errors.push(`${prefix} [VISUAL MISMATCH] Bangun jawaban kunci (${v.shape}) tidak sama dengan deret soal (${shape}).`);
-            }
-            if (v.rotation !== undefined) {
-              const optAngle = normalizeDeg(v.rotation);
-              if (optAngle !== expectedAngle) {
-                errors.push(`${prefix} [GEOMETRIC ANGLE ERROR] Rotasi kunci opsi [${q.answer}] adalah ${optAngle}°, tetapi perhitungan deret mengharuskan ${expectedAngle}°!`);
+      const v = q.visual;
+      const KNOWN_KINDS = ["series", "analogy", "odd-five", "net", "grid-9"];
+      if (!KNOWN_KINDS.includes(v.kind)) {
+        errors.push(`${prefix} [VISUAL] kind '${v.kind}' tidak dikenal (harus: ${KNOWN_KINDS.join(", ")}).`);
+      } else {
+        const cells = v.cells;
+        const isGlyph = (g) => g && g !== "?" && g !== null && Array.isArray(g.shapes) && g.shapes.length > 0;
+        const validateGlyph = (g, where) => {
+          for (const sh of g.shapes) {
+            if ("polyRect" in sh) {
+              if (!Array.isArray(sh.polyRect) || sh.polyRect.length < 3) {
+                errors.push(`${prefix} [VISUAL ${where}] polyRect butuh >= 3 titik.`);
+              }
+              for (const [x, y] of sh.polyRect) {
+                if (x < 0 || x > 100 || y < 0 || y > 100) {
+                  errors.push(`${prefix} [VISUAL ${where}] koordinat polyRect di luar 0-100.`);
+                }
               }
             }
-            if (expectedDots !== undefined) {
-              if (v.dots !== expectedDots) {
-                errors.push(`${prefix} [DOTS COUNT ERROR] Titik kunci opsi [${q.answer}] adalah ${v.dots}, tetapi perhitungan deret mengharuskan ${expectedDots}!`);
+            if ("circle" in sh && (sh.circle.r <= 0 || sh.circle.r > 50)) {
+              errors.push(`${prefix} [VISUAL ${where}] circle.r di luar 1-50.`);
+            }
+            if ("spikes" in sh && (sh.spikes.k < 3 || sh.spikes.rOut > 50 || sh.spikes.rIn >= sh.spikes.rOut)) {
+              errors.push(`${prefix} [VISUAL ${where}] spikes tidak valid (k>=3, rOut<=50, rIn<rOut).`);
+            }
+            if ("zigzag" in sh && (sh.zigzag.peaks < 1 || sh.zigzag.amp <= 0 || sh.zigzag.amp > 46)) {
+              errors.push(`${prefix} [VISUAL ${where}] zigzag tidak valid (peaks>=1, amp 1-46).`);
+            }
+            if ("dots" in sh && (sh.dots.cols < 1 || sh.dots.rows < 1 || (sh.dots.cols - 1) * sh.dots.gap + sh.dots.r * 2 > 96 || (sh.dots.rows - 1) * sh.dots.gap + sh.dots.r * 2 > 96)) {
+              errors.push(`${prefix} [VISUAL ${where}] kisi dots meluap dari sel 100x100.`);
+            }
+            if ("letter" in sh && (!sh.letter || sh.letter.length > 3)) {
+              errors.push(`${prefix} [VISUAL ${where}] letter maksimal 3 karakter.`);
+            }
+            if ("image" in sh) {
+              const imgPath = path.resolve("public", sh.image.replace(/^\//, ""));
+              if (!fsSync.existsSync(imgPath)) {
+                errors.push(`${prefix} [VISUAL ${where}] file image tidak ditemukan: ${sh.image}`);
+              }
+            }
+          }
+        };
+        if (v.kind === "series") {
+          if (!Array.isArray(cells) || cells.length < 3) {
+            errors.push(`${prefix} [VISUAL] series butuh minimal 3 sel.`);
+          } else if (cells.filter((c) => c === "?").length !== 1) {
+            errors.push(`${prefix} [VISUAL] series harus punya tepat satu sel "?".`);
+          }
+        }
+        if (v.kind === "odd-five" && (!Array.isArray(cells) || cells.length !== 5)) {
+          errors.push(`${prefix} [VISUAL] odd-five harus 5 sel.`);
+        }
+        if (v.kind === "grid-9") {
+          if (!Array.isArray(cells) || cells.length !== 9) {
+            errors.push(`${prefix} [VISUAL] grid-9 harus 9 sel.`);
+          } else if (cells.filter((c) => c === "?").length !== 1) {
+            errors.push(`${prefix} [VISUAL] grid-9 harus punya tepat satu sel "?".`);
+          }
+        }
+        if (v.kind === "analogy" && (!Array.isArray(cells) || cells.length !== 4)) {
+          errors.push(`${prefix} [VISUAL] analogy harus 4 sel.`);
+        }
+        if (v.kind === "net") {
+          if (!Number.isInteger(v.cols) || v.cols < 2) {
+            errors.push(`${prefix} [VISUAL] net.cols harus integer >= 2.`);
+          } else if (!Array.isArray(cells) || cells.length % v.cols !== 0) {
+            errors.push(`${prefix} [VISUAL] panjang cells net (${cells?.length}) harus kelipatan cols (${v.cols}).`);
+          }
+        }
+        for (const [ci, cell] of (cells ?? []).entries()) {
+          if (cell && cell !== "?" && cell !== null) validateGlyph(cell, `sel ${ci + 1}`);
+        }
+      }
+    }
+
+    // 8. Opsi visual (Glyph langsung, tanpa pembungkus kind)
+    if (q.options) {
+      for (const [oi, opt] of q.options.entries()) {
+        if (opt.visual) {
+          if (opt.visual.kind) {
+            errors.push(`${prefix} [VISUAL OPSI ${oi}] opsi memakai VisualSpec berkind; opsi harus Glyph langsung ({ shapes, frame? }).`);
+          } else if (!Array.isArray(opt.visual.shapes) || opt.visual.shapes.length === 0) {
+            errors.push(`${prefix} [VISUAL OPSI ${oi}] Glyph tanpa shapes.`);
+          } else {
+            for (const sh of opt.visual.shapes) {
+              if ("polyRect" in sh) {
+                for (const [x, y] of sh.polyRect) {
+                  if (x < 0 || x > 100 || y < 0 || y > 100) {
+                    errors.push(`${prefix} [VISUAL OPSI ${oi}] koordinat polyRect di luar 0-100.`);
+                  }
+                }
               }
             }
           }

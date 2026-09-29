@@ -8,7 +8,7 @@ import type { ExamConfig, Question, RunningExam, SessionResult } from "@/lib/typ
 import { sampleQuestions } from "@/data/bank";
 import { computeSubScores, formatTime, useCountdown } from "@/hooks/use-exam";
 import { localStore } from "@/lib/storage";
-import { VisualPanel } from "@/components/figural";
+import { GlyphPanelOption, VisualPanel } from "@/components/figural";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -371,7 +371,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                     {LETTERS[i]}
                   </span>
                   {opt.visual ? (
-                    <VisualPanel spec={opt.visual} size="sm" />
+                    <GlyphPanelOption glyph={opt.visual} />
                   ) : (
                     <span className="text-sm">{opt.text}</span>
                   )}
