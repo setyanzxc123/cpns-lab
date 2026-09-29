@@ -4,10 +4,11 @@
 // analisis manajemen waktu (pacing time) vs benchmark resmi (~54s/soal),
 // skor per subtes, review jawaban berfilter, dan tombol minta penjelasan AI.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Question, SessionResult } from "@/lib/types";
 import { CATEGORY_INFO } from "@/data/bank";
 import { formatTime } from "@/hooks/use-exam";
+import { localStore } from "@/lib/storage";
 import { VisualPanel } from "@/components/figural";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -418,11 +419,27 @@ function ReviewCard({
 }) {
   const [aiExplain, setAiExplain] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
 
   const isTimeTrap = timeSpentSec != null && timeSpentSec > 90;
   const isFast = timeSpentSec != null && timeSpentSec <= 45;
 
+  useEffect(() => {
+    const cached = localStore.getAiExplanation(q.id, choice);
+    if (cached) {
+      setAiExplain(cached);
+      setFromCache(true);
+    }
+  }, [q.id, choice]);
+
   async function askAi() {
+    const cached = localStore.getAiExplanation(q.id, choice);
+    if (cached) {
+      setAiExplain(cached);
+      setFromCache(true);
+      return;
+    }
+
     setLoading(true);
     setAiExplain(null);
     try {
@@ -443,7 +460,13 @@ function ReviewCard({
         }),
       });
       const data = await res.json();
-      setAiExplain(data.explanation ?? "AI tidak tersedia saat ini.");
+      if (res.ok && data.explanation) {
+        setAiExplain(data.explanation);
+        setFromCache(false);
+        localStore.saveAiExplanation(q.id, choice, data.explanation);
+      } else {
+        setAiExplain(data.explanation ?? "AI tidak tersedia saat ini.");
+      }
     } catch {
       setAiExplain("Gagal menghubungi AI. Periksa koneksi atau konfigurasi GEMINI_API_KEY.");
     } finally {
@@ -542,9 +565,16 @@ function ReviewCard({
         <div>
           {aiExplain ? (
             <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm leading-relaxed dark:border-purple-900/50 dark:bg-purple-950/30">
-              <p className="mb-1 flex items-center gap-1 font-semibold text-purple-800 dark:text-purple-300">
-                <Sparkles className="h-3.5 w-3.5" /> Penjelasan AI
-              </p>
+              <div className="mb-1 flex items-center justify-between text-xs font-semibold text-purple-800 dark:text-purple-300">
+                <span className="flex items-center gap-1">
+                  <Sparkles className="h-3.5 w-3.5" /> Penjelasan AI
+                </span>
+                {fromCache && (
+                  <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-normal text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                    Tersimpan di Cache
+                  </span>
+                )}
+              </div>
               <p className="whitespace-pre-wrap text-purple-950 dark:text-purple-200">{aiExplain}</p>
             </div>
           ) : (

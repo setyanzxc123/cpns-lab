@@ -9,6 +9,7 @@ const K_RESULTS = "cpns.results";
 const K_WRONG = "cpns.wrong";
 const K_CUSTOM = "cpns.customQuestions";
 const K_RUNNING = "cpns.runningExam";
+const K_EXPLAIN_CACHE = "cpns.aiExplains";
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -66,5 +67,23 @@ export const localStore = {
   },
   clearRunning() {
     if (typeof window !== "undefined") window.localStorage.removeItem(K_RUNNING);
+  },
+  getAiExplanation(questionId: string, choice: number | null): string | null {
+    const cache = read<Record<string, string>>(K_EXPLAIN_CACHE, {});
+    const key = `${questionId}:${choice ?? "none"}`;
+    return cache[key] ?? null;
+  },
+  saveAiExplanation(questionId: string, choice: number | null, text: string) {
+    const cache = read<Record<string, string>>(K_EXPLAIN_CACHE, {});
+    const key = `${questionId}:${choice ?? "none"}`;
+    cache[key] = text;
+    const keys = Object.keys(cache);
+    if (keys.length > 300) {
+      delete cache[keys[0]];
+    }
+    write(K_EXPLAIN_CACHE, cache);
+  },
+  getAllAiExplanations(): Record<string, string> {
+    return read<Record<string, string>>(K_EXPLAIN_CACHE, {});
   },
 };
