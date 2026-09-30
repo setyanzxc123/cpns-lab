@@ -169,12 +169,21 @@ export function SiteHeader() {
     }
   }
 
+  // Login Google dikelola Supabase OAuth. Kredensial client diatur di dashboard
+  // Supabase (Auth -> Providers -> Google); env ini hanya saklar tampilan tombol.
+  const googleEnabled = process.env.NEXT_PUBLIC_HAS_GOOGLE === "1";
+
   async function signInGoogle() {
-    const sb = createClient();
-    await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
-    });
+    try {
+      const sb = createClient();
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) toast.error(error.message);
+    } catch {
+      toast.error("Gagal mengarahkan ke Google. Periksa koneksi Anda.");
+    }
   }
 
   return (
@@ -276,13 +285,17 @@ export function SiteHeader() {
                       Riwayat &amp; progres tersinkron antar perangkat via Supabase. Data sesi tamu di perangkat ini akan otomatis disinkronkan ke akun Anda saat masuk.
                     </DialogDescription>
                   </DialogHeader>
-                  <Button variant="outline" onClick={signInGoogle} className="w-full">
-                    Lanjut dengan Google
-                  </Button>
-                  <div className="relative text-center text-xs text-muted-foreground">
-                    <span className="relative z-10 bg-background px-2">atau email</span>
-                    <span className="absolute inset-x-0 top-1/2 h-px bg-border" />
-                  </div>
+                  {googleEnabled && (
+                    <Button variant="outline" onClick={signInGoogle} className="w-full">
+                      Lanjut dengan Google
+                    </Button>
+                  )}
+                  {googleEnabled && (
+                    <div className="relative text-center text-xs text-muted-foreground">
+                      <span className="relative z-10 bg-background px-2">atau email</span>
+                      <span className="absolute inset-x-0 top-1/2 h-px bg-border" />
+                    </div>
+                  )}
                   <form action={signInEmail} className="space-y-2">
                     <input
                       name="email"
