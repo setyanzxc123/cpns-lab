@@ -52,73 +52,106 @@ export const localRepo: Repository = {
 
 class SupabaseRepo implements Repository {
   async listResults(): Promise<SessionResult[]> {
-    const sb = createClient();
-    const { data } = await sb
-      .from("exam_sessions")
-      .select("payload")
-      .order("finished_at", { ascending: false })
-      .limit(200);
-    return (data ?? []).map((row) => row.payload as SessionResult);
+    // Cloud kanonik, tapi hasil yang baru dibuat offline (belum ter-push)
+    // tetap tampil: gabungkan dengan localStorage, cloud menimpa by id.
+    let cloud: SessionResult[] = [];
+    try {
+      const sb = createClient();
+      const { data } = await sb
+        .from("exam_sessions")
+        .select("payload")
+        .order("finished_at", { ascending: false })
+        .limit(200);
+      cloud = (data ?? []).map((row) => row.payload as SessionResult);
+    } catch {
+      // offline — pakai lokal saja
+    }
+    const byId = new Map<string, SessionResult>();
+    for (const r of [...localStore.getResults(), ...cloud]) {
+      if (r?.id) byId.set(r.id, r);
+    }
+    return [...byId.values()]
+      .sort((a, b) => b.finishedAt - a.finishedAt)
+      .slice(0, 200);
   }
   async saveResult(r: SessionResult) {
-    const sb = createClient();
-    await sb.from("exam_sessions").insert({
-      id: r.id,
-      mode: r.mode,
-      total_score: r.totalScore,
-      max_score: r.maxScore,
-      finished_at: new Date(r.finishedAt).toISOString(),
-      payload: r,
-    });
-    // Sudah tersimpan di cloud — cukup beri tahu UI; tidak perlu masuk antrean.
-    notifyProgressChanged();
+    // Offline-first: selalu tulis localStorage + antrean auto-sync; cloud
+    // menerima lewat pushPending (upsert by id) saat online.
+    localStore.saveResult(r);
+    notifyProgressChanged(r.id);
   }
   async listWrong(): Promise<Record<string, number>> {
-    const sb = createClient();
-    const { data } = await sb.from("wrong_questions").select("question_id, count");
-    const out: Record<string, number> = {};
-    for (const row of data ?? []) out[row.question_id] = row.count;
-    return out;
-  }
-  async recordWrong(id: string, wasWrong: boolean) {
-    const sb = createClient();
-    if (wasWrong) {
-      await sb.rpc("upsert_wrong_question", { p_question_id: id });
-    } else {
-      await sb.from("wrong_questions").delete().eq("question_id", id);
+    try {
+      const sb = createClient();
+      const { data } = await sb.from("wrong_questions").select("question_id, count");
+      const cloud: Record<string, number> = {};
+      for (const row of data ?? []) cloud[row.question_id] = row.count;
+      // max(cloud, local) — konsisten dengan strategi push auto-sync
+      const merged: Record<string, number> = { ...cloud };
+      for (const [id, n] of Object.entries(localStore.getWrong())) {
+        merged[id] = Math.max(merged[id] ?? 0, n);
+      }
+      return merged;
+    } catch {
+      return localStore.getWrong();
     }
   }
+  async recordWrong(id: string, wasWrong: boolean) {
+    // Offline-first: hitung lokal, sinkron via pushPending (max-count).
+    localStore.recordWrong(id, wasWrong);
+    notifyProgressChanged();
+  }
   async clearWrong(ids?: string[]) {
-    const sb = createClient();
-    if (ids) {
-      await sb.from("wrong_questions").delete().in("question_id", ids);
-    } else {
-      await sb.from("wrong_questions").delete().neq("question_id", "");
+    localStore.clearWrong(ids);
+    try {
+      const sb = createClient();
+      if (ids) {
+        await sb.from("wrong_questions").delete().in("question_id", ids);
+      } else {
+        await sb.from("wrong_questions").delete().neq("question_id", "");
+      }
+    } catch {
+      // offline — penghapusan lokal dulu, cloud menyusul saat push berikutnya
     }
   }
   async listCustomQuestions(): Promise<Question[]> {
-    const sb = createClient();
-    const { data } = await sb.from("custom_questions").select("payload");
-    return (data ?? []).map((row) => row.payload as Question);
+    try {
+      const sb = createClient();
+      const { data } = await sb.from("custom_questions").select("payload");
+      const cloud = (data ?? []).map((row) => row.payload as Question);
+      const byId = new Map<string, Question>();
+      for (const q of [...localStore.getCustomQuestions(), ...cloud]) {
+        if (q?.id) byId.set(q.id, q);
+      }
+      return [...byId.values()];
+    } catch {
+      return localStore.getCustomQuestions();
+    }
   }
   async saveCustomQuestions(qs: Question[]) {
-    const sb = createClient();
-    // ganti seluruh set soal kustom milik user (sederhana & idempoten)
-    await sb.from("custom_questions").delete().neq("question_id", "");
-    if (qs.length === 0) return;
-    await sb.from("custom_questions").insert(
-      qs.map((q) => ({ question_id: q.id, payload: q })),
-    );
+    localStore.saveCustomQuestions(qs);
+    try {
+      const sb = createClient();
+      // ganti seluruh set soal kustom milik user (sederhana & idempoten)
+      await sb.from("custom_questions").delete().neq("question_id", "");
+      if (qs.length === 0) return;
+      await sb.from("custom_questions").insert(
+        qs.map((q) => ({ question_id: q.id, payload: q })),
+      );
+    } catch {
+      // offline — lokal sudah tersimpan; sinkron penuh menyusul saat login sync
+    }
   }
 }
 
-/** Select active repository: Supabase if user is logged in, otherwise local. */
+/** Select active repository: Supabase if a session exists, otherwise local. */
 export async function getRepo(): Promise<Repository> {
   try {
     if (supabaseConfiguredClient()) {
       const sb = createClient();
-      const { data } = await sb.auth.getUser();
-      if (data.user) {
+      // getSession membaca sesi dari localStorage — tetap terdeteksi saat offline.
+      const { data } = await sb.auth.getSession();
+      if (data.session?.user) {
         if (localStore.hasGuestData()) {
           void syncGuestToCloud().catch(() => {});
         }
