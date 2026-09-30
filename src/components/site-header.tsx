@@ -6,14 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { supabaseConfigured, createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -24,9 +16,7 @@ import {
   BarChart3,
   Library,
   Bot,
-  LogIn,
   LogOut,
-  Loader2,
   Cloud,
   HardDrive,
   RefreshCw,
@@ -49,10 +39,10 @@ const NAV = [
   { href: "/ai", label: "Tutor AI", icon: Bot },
 ];
 
+
 export function SiteHeader() {
   const pathname = usePathname();
   const [user, setUser] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -131,60 +121,8 @@ export function SiteHeader() {
     }
   }
 
-  async function signInEmail(formData: FormData) {
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
-    setBusy(true);
-    try {
-      const sb = createClient();
-      const { error } = await sb.auth.signInWithPassword({ email, password });
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success("Berhasil masuk.");
-      }
-    } catch {
-      toast.error("Gagal masuk. Periksa koneksi Anda.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function signUpEmail(formData: FormData) {
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
-    setBusy(true);
-    try {
-      const sb = createClient();
-      const { error } = await sb.auth.signUp({ email, password });
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success("Pendaftaran berhasil. Silakan periksa email untuk konfirmasi.");
-      }
-    } catch {
-      toast.error("Gagal mendaftar. Periksa koneksi Anda.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Login Google dikelola Supabase OAuth. Kredensial client diatur di dashboard
-  // Supabase (Auth -> Providers -> Google); env ini hanya saklar tampilan tombol.
-  const googleEnabled = process.env.NEXT_PUBLIC_HAS_GOOGLE === "1";
-
-  async function signInGoogle() {
-    try {
-      const sb = createClient();
-      const { error } = await sb.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) toast.error(error.message);
-    } catch {
-      toast.error("Gagal mengarahkan ke Google. Periksa koneksi Anda.");
-    }
-  }
+  // Login (Google) ditangani AuthGate di layout — header hanya menampilkan
+  // status user yang sudah masuk.
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -241,91 +179,33 @@ export function SiteHeader() {
                       : "Cloud"}
                 </span>
               </button>
-            ) : (
+            ) : !supabaseConfigured() ? (
               <div
                 className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-muted bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
-                title="Data tersimpan di browser ini (Mode Tamu)"
+                title="Env Supabase tidak terpasang — data hanya di browser ini (dev lokal)"
               >
                 <HardDrive className="h-3 w-3" />
-                <span>Mode Tamu</span>
+                <span>Mode Dev</span>
               </div>
-            )
+            ) : null
           )}
-          {mounted && supabaseConfigured() ? (
-            user ? (
-              <>
-                <span className="hidden text-xs text-muted-foreground sm:inline">{user}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const sb = createClient();
-                    await sb.auth.signOut();
-                    setUser(null);
-                    toast.info("Anda telah keluar.");
-                  }}
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Keluar</span>
-                </Button>
-              </>
-            ) : (
-              <Dialog>
-                <DialogTrigger
-                  render={
-                    <Button size="sm">
-                      <LogIn className="h-4 w-4" /> Masuk
-                    </Button>
-                  }
-                />
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Masuk ke CPNS Lab</DialogTitle>
-                    <DialogDescription>
-                      Riwayat &amp; progres tersinkron antar perangkat via Supabase. Data sesi tamu di perangkat ini akan otomatis disinkronkan ke akun Anda saat masuk.
-                    </DialogDescription>
-                  </DialogHeader>
-                  {googleEnabled && (
-                    <Button variant="outline" onClick={signInGoogle} className="w-full">
-                      Lanjut dengan Google
-                    </Button>
-                  )}
-                  {googleEnabled && (
-                    <div className="relative text-center text-xs text-muted-foreground">
-                      <span className="relative z-10 bg-background px-2">atau email</span>
-                      <span className="absolute inset-x-0 top-1/2 h-px bg-border" />
-                    </div>
-                  )}
-                  <form action={signInEmail} className="space-y-2">
-                    <input
-                      name="email"
-                      type="email"
-                      required
-                      placeholder="email@contoh.com"
-                      className="w-full rounded-md border px-3 py-2 text-sm"
-                    />
-                    <input
-                      name="password"
-                      type="password"
-                      required
-                      minLength={6}
-                      placeholder="kata sandi (min. 6 karakter)"
-                      className="w-full rounded-md border px-3 py-2 text-sm"
-                    />
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={busy} className="flex-1">
-                        {busy && <Loader2 className="h-4 w-4 animate-spin" />} Masuk
-                      </Button>
-                    </div>
-                  </form>
-                  <form action={signUpEmail}>
-                    <Button type="submit" variant="link" className="w-full text-xs">
-                      Belum punya akun? Daftar dengan email
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )
+          {mounted && supabaseConfigured() && user ? (
+            <>
+              <span className="hidden text-xs text-muted-foreground sm:inline">{user}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const sb = createClient();
+                  await sb.auth.signOut();
+                  setUser(null);
+                  toast.info("Anda telah keluar.");
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Keluar</span>
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
