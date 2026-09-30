@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { SiteHeader } from "@/components/site-header";
+import { AuthGate } from "@/components/auth-gate";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -55,7 +56,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SiteHeader />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+            <AuthGate>{children}</AuthGate>
+          </main>
           <footer className="border-t py-4 text-center text-xs text-muted-foreground">
             CPNS Lab — alat belajar mandiri. Soal contoh, bukan soal resmi BKN.
           </footer>
