@@ -149,16 +149,19 @@ async function run() {
       }
     }
 
-    // 7. VERIFIKASI VISUAL FIGURAL (SPEC VEKTOR BARU)
+    // 7. VERIFIKASI VISUAL FIGURAL (SPEC VEKTOR STANDAR PSIKOMETRI INTERNASIONAL)
     if (q.visual) {
       const v = q.visual;
-      const KNOWN_KINDS = ["series", "analogy", "odd-five", "net", "grid-9"];
+      const KNOWN_KINDS = ["series", "analogy", "odd-five", "net", "grid-9", "grid-4"];
       if (!KNOWN_KINDS.includes(v.kind)) {
         errors.push(`${prefix} [VISUAL] kind '${v.kind}' tidak dikenal (harus: ${KNOWN_KINDS.join(", ")}).`);
       } else {
         const cells = v.cells;
-        const isGlyph = (g) => g && g !== "?" && g !== null && Array.isArray(g.shapes) && g.shapes.length > 0;
         const validateGlyph = (g, where) => {
+          if (!g || !Array.isArray(g.shapes) || g.shapes.length === 0) {
+            errors.push(`${prefix} [VISUAL ${where}] Glyph kosong atau tanpa shapes.`);
+            return;
+          }
           for (const sh of g.shapes) {
             if ("polyRect" in sh) {
               if (!Array.isArray(sh.polyRect) || sh.polyRect.length < 3) {
@@ -170,17 +173,57 @@ async function run() {
                 }
               }
             }
-            if ("circle" in sh && (sh.circle.r <= 0 || sh.circle.r > 50)) {
-              errors.push(`${prefix} [VISUAL ${where}] circle.r di luar 1-50.`);
+            if ("regularPolygon" in sh) {
+              const rp = sh.regularPolygon;
+              if (rp.n < 3 || rp.r <= 0 || rp.r > 60) {
+                errors.push(`${prefix} [VISUAL ${where}] regularPolygon tidak valid (n>=3, r 1-60).`);
+              }
             }
-            if ("spikes" in sh && (sh.spikes.k < 3 || sh.spikes.rOut > 50 || sh.spikes.rIn >= sh.spikes.rOut)) {
-              errors.push(`${prefix} [VISUAL ${where}] spikes tidak valid (k>=3, rOut<=50, rIn<rOut).`);
+            if ("sector" in sh) {
+              const sec = sh.sector;
+              if (sec.r <= 0 || sec.r > 60) {
+                errors.push(`${prefix} [VISUAL ${where}] sector.r di luar 1-60.`);
+              }
+            }
+            if ("ellipse" in sh) {
+              const el = sh.ellipse;
+              if (el.rx <= 0 || el.ry <= 0) {
+                errors.push(`${prefix} [VISUAL ${where}] ellipse rx dan ry harus > 0.`);
+              }
+            }
+            if ("line" in sh) {
+              const ln = sh.line;
+              if (typeof ln.x1 !== "number" || typeof ln.y1 !== "number" || typeof ln.x2 !== "number" || typeof ln.y2 !== "number") {
+                errors.push(`${prefix} [VISUAL ${where}] line koordinat harus berupa angka.`);
+              }
+            }
+            if ("path" in sh && (!sh.path.d || typeof sh.path.d !== "string")) {
+              errors.push(`${prefix} [VISUAL ${where}] path butuh d (string).`);
+            }
+            if ("composite" in sh) {
+              if (!Array.isArray(sh.composite.shapes)) {
+                errors.push(`${prefix} [VISUAL ${where}] composite butuh shapes array.`);
+              }
+            }
+            if ("circle" in sh && (sh.circle.r <= 0 || sh.circle.r > 60)) {
+              errors.push(`${prefix} [VISUAL ${where}] circle.r di luar 1-60.`);
+            }
+            if ("spikes" in sh && (sh.spikes.k < 3 || sh.spikes.rOut > 60 || sh.spikes.rIn >= sh.spikes.rOut)) {
+              errors.push(`${prefix} [VISUAL ${where}] spikes tidak valid (k>=3, rOut<=60, rIn<rOut).`);
             }
             if ("zigzag" in sh && (sh.zigzag.peaks < 1 || sh.zigzag.amp <= 0 || sh.zigzag.amp > 46)) {
               errors.push(`${prefix} [VISUAL ${where}] zigzag tidak valid (peaks>=1, amp 1-46).`);
             }
-            if ("dots" in sh && (sh.dots.cols < 1 || sh.dots.rows < 1 || (sh.dots.cols - 1) * sh.dots.gap + sh.dots.r * 2 > 96 || (sh.dots.rows - 1) * sh.dots.gap + sh.dots.r * 2 > 96)) {
-              errors.push(`${prefix} [VISUAL ${where}] kisi dots meluap dari sel 100x100.`);
+            if ("dots" in sh) {
+              if (sh.dots.points) {
+                if (!Array.isArray(sh.dots.points) || sh.dots.points.length === 0) {
+                  errors.push(`${prefix} [VISUAL ${where}] dots.points harus array koordinat.`);
+                }
+              } else if (sh.dots.cols && sh.dots.rows) {
+                if (sh.dots.cols < 1 || sh.dots.rows < 1 || (sh.dots.cols - 1) * sh.dots.gap + sh.dots.r * 2 > 98 || (sh.dots.rows - 1) * sh.dots.gap + sh.dots.r * 2 > 98) {
+                  errors.push(`${prefix} [VISUAL ${where}] kisi dots meluap dari sel 100x100.`);
+                }
+              }
             }
             if ("letter" in sh && (!sh.letter || sh.letter.length > 3)) {
               errors.push(`${prefix} [VISUAL ${where}] letter maksimal 3 karakter.`);
@@ -196,8 +239,8 @@ async function run() {
         if (v.kind === "series") {
           if (!Array.isArray(cells) || cells.length < 3) {
             errors.push(`${prefix} [VISUAL] series butuh minimal 3 sel.`);
-          } else if (cells.filter((c) => c === "?").length !== 1) {
-            errors.push(`${prefix} [VISUAL] series harus punya tepat satu sel "?".`);
+          } else if (cells.filter((c) => c === "?").length < 1) {
+            errors.push(`${prefix} [VISUAL] series harus punya minimal satu sel "?".`);
           }
         }
         if (v.kind === "odd-five" && (!Array.isArray(cells) || cells.length !== 5)) {
@@ -206,8 +249,13 @@ async function run() {
         if (v.kind === "grid-9") {
           if (!Array.isArray(cells) || cells.length !== 9) {
             errors.push(`${prefix} [VISUAL] grid-9 harus 9 sel.`);
-          } else if (cells.filter((c) => c === "?").length !== 1) {
-            errors.push(`${prefix} [VISUAL] grid-9 harus punya tepat satu sel "?".`);
+          } else if (cells.filter((c) => c === "?").length < 1) {
+            errors.push(`${prefix} [VISUAL] grid-9 harus punya minimal satu sel "?".`);
+          }
+        }
+        if (v.kind === "grid-4") {
+          if (!Array.isArray(cells) || cells.length !== 4) {
+            errors.push(`${prefix} [VISUAL] grid-4 harus 4 sel.`);
           }
         }
         if (v.kind === "analogy" && (!Array.isArray(cells) || cells.length !== 4)) {
@@ -226,12 +274,20 @@ async function run() {
       }
     }
 
-    // 8. Opsi visual (Glyph langsung, tanpa pembungkus kind)
+    // 8. Opsi visual (Glyph tunggal atau pasangan dual-v / dual-h)
     if (q.options) {
       for (const [oi, opt] of q.options.entries()) {
         if (opt.visual) {
-          if (opt.visual.kind) {
-            errors.push(`${prefix} [VISUAL OPSI ${oi}] opsi memakai VisualSpec berkind; opsi harus Glyph langsung ({ shapes, frame? }).`);
+          if (opt.visual.kind === "dual-v") {
+            if (!opt.visual.top || !opt.visual.bottom) {
+              errors.push(`${prefix} [VISUAL OPSI ${oi}] dual-v butuh top dan bottom.`);
+            }
+          } else if (opt.visual.kind === "dual-h") {
+            if (!opt.visual.left || !opt.visual.right) {
+              errors.push(`${prefix} [VISUAL OPSI ${oi}] dual-h butuh left dan right.`);
+            }
+          } else if (opt.visual.kind) {
+            errors.push(`${prefix} [VISUAL OPSI ${oi}] opsi memakai VisualSpec '${opt.visual.kind}' yang tidak sah; opsi harus Glyph langsung atau dual-v/dual-h.`);
           } else if (!Array.isArray(opt.visual.shapes) || opt.visual.shapes.length === 0) {
             errors.push(`${prefix} [VISUAL OPSI ${oi}] Glyph tanpa shapes.`);
           } else {

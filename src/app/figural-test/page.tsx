@@ -1,104 +1,168 @@
 "use client";
 
-// Halaman tes renderer figural — pratinjau 4 pola dari spesifikasi vektor.
-// Dipakai untuk verifikasi visual; juga jadi acuan kontrak bagi agent ekstraksi.
+// Halaman tes renderer figural standar tes IQ internasional & CAT BKN.
+// Menampilkan pratinjau pola geometris Raven's Progressive Matrices, Cattell, dan WAIS.
 
-import { VisualPanel } from "@/components/figural";
+import { GlyphPanelOption, VisualPanel } from "@/components/figural";
+import { FiguralShape, createDualOption } from "@/lib/figural-engine";
 import type { Glyph, VisualSpec } from "@/lib/types";
 
-const tangga: Glyph = {
-  shapes: [{ polyRect: [[30, 76], [30, 60], [42, 60], [42, 44], [54, 44], [54, 28], [70, 28], [70, 76]], fill: "solid" }],
-  frame: { double: true },
+// 1. Roda Juring 8 Bagian Berputar (Raven's Progressive Matrices standard)
+const wheelA: Glyph = {
+  shapes: FiguralShape.pieWheel([
+    { startAngle: 0, endAngle: 45, fill: "solid" },
+    { startAngle: 45, endAngle: 90, fill: "outline" },
+    { startAngle: 90, endAngle: 135, fill: "solid" },
+    { startAngle: 135, endAngle: 180, fill: "hatch" },
+    { startAngle: 180, endAngle: 225, fill: "solid" },
+    { startAngle: 225, endAngle: 270, fill: "outline" },
+    { startAngle: 270, endAngle: 315, fill: "solid" },
+    { startAngle: 315, endAngle: 360, fill: "hatch" },
+  ]),
 };
 
-const titikBingkai: Glyph = {
-  shapes: [{ dots: { cols: 4, rows: 5, gap: 14, r: 3.5 } }],
-  frame: { double: true },
+const wheelB: Glyph = {
+  shapes: FiguralShape.pieWheel([
+    { startAngle: 45, endAngle: 90, fill: "solid" },
+    { startAngle: 90, endAngle: 135, fill: "outline" },
+    { startAngle: 135, endAngle: 180, fill: "solid" },
+    { startAngle: 180, endAngle: 225, fill: "hatch" },
+    { startAngle: 225, endAngle: 270, fill: "solid" },
+    { startAngle: 270, endAngle: 315, fill: "outline" },
+    { startAngle: 315, endAngle: 360, fill: "solid" },
+    { startAngle: 0, endAngle: 45, fill: "hatch" },
+  ]),
 };
 
-const duri: Glyph = {
-  shapes: [{ spikes: { k: 7, rOut: 30, rIn: 12, rot: 15, fill: "solid" } }],
-  frame: { double: true },
+const wheelC: Glyph = {
+  shapes: FiguralShape.pieWheel([
+    { startAngle: 90, endAngle: 135, fill: "solid" },
+    { startAngle: 135, endAngle: 180, fill: "outline" },
+    { startAngle: 180, endAngle: 225, fill: "solid" },
+    { startAngle: 225, endAngle: 270, fill: "hatch" },
+    { startAngle: 270, endAngle: 315, fill: "solid" },
+    { startAngle: 315, endAngle: 360, fill: "outline" },
+    { startAngle: 0, endAngle: 45, fill: "solid" },
+    { startAngle: 45, endAngle: 90, fill: "hatch" },
+  ]),
 };
 
-const mesin: Glyph = {
+// 2. Poligon Beraturan & Titik Sudut Presisi
+const hexWithCornerDots: Glyph = {
   shapes: [
-    { polyRect: [[26, 50], [60, 50], [60, 70], [26, 70]], fill: "solid" },
-    { circle: { r: 14, fill: "outline" } },
-    { polyRect: [[54, 24], [74, 24], [74, 42], [54, 42]], fill: "outline" },
+    FiguralShape.hexagon(34, { fill: "cross-hatch" }),
+    FiguralShape.circle(12, { fill: "white" }),
+    FiguralShape.cornerDots(3, 14),
   ],
   frame: { double: true },
 };
 
-const pola1: VisualSpec = { kind: "series", cells: [tangga, "?", tangga, tangga, tangga] };
-const pola2: VisualSpec = {
+// 3. Path Kurva Vektor Bebas (Contoh: Hati Analogi)
+const heartGlyph: Glyph = {
+  shapes: [
+    FiguralShape.path(
+      "M 50 78 C 30 60, 20 44, 20 32 C 20 18, 32 14, 42 22 C 46 25, 50 30, 50 30 C 50 30, 54 25, 58 22 C 68 14, 80 18, 80 32 C 80 44, 70 60, 50 78 Z",
+      { fill: "solid" }
+    ),
+  ],
+};
+
+// 4. Opsi Jawaban Pasangan Bertingkat (Dual-V untuk 2 tanda tanya)
+const dualOptionSample = createDualOption(
+  {
+    shapes: [FiguralShape.square(18, { fill: "solid" })],
+  },
+  {
+    shapes: [FiguralShape.triangle(18, { fill: "hatch" })],
+  }
+);
+
+// 5. Grid 9 Kotak dengan 2 Missing Cells ('?')
+const grid9WithTwoMissing: VisualSpec = {
+  kind: "grid-9",
+  cells: [
+    hexWithCornerDots,
+    hexWithCornerDots,
+    hexWithCornerDots,
+    hexWithCornerDots,
+    "?", // missing cell 1 (tengah)
+    hexWithCornerDots,
+    hexWithCornerDots,
+    hexWithCornerDots,
+    "?", // missing cell 2 (kanan bawah)
+  ],
+};
+
+const polaWheelSeries: VisualSpec = {
+  kind: "series",
+  cells: [wheelA, wheelB, wheelC, "?"],
+};
+
+const polaAnalogy: VisualSpec = {
   kind: "analogy",
   cells: [
-    { shapes: [{ circle: { r: 34, fill: "outline" } }] },
-    { shapes: [{ circle: { r: 18, fill: "solid" } }] },
-    { shapes: [{ polyRect: [[18, 18], [82, 18], [82, 82], [18, 82]], fill: "outline" }] },
-    "?",
-  ],
-};
-const pola3: VisualSpec = {
-  kind: "odd-five",
-  cells: [duri, duri, duri, { shapes: [{ spikes: { k: 7, rOut: 30, rIn: 12, rot: 60, fill: "solid" } }] }, duri],
-};
-const pola4: VisualSpec = {
-  kind: "net",
-  cols: 3,
-  cells: [
-    null,
-    { shapes: [{ arrow: { rot: 180 } }] },
-    null,
-    { shapes: [{ letter: "A" }] },
-    { shapes: [{ arrow: { rot: 0 } }] },
-    { shapes: [{ letter: "B" }] },
-    { shapes: [{ arrow: { rot: 90 } }] },
-    null,
-    null,
-  ],
-};
-const pola5: VisualSpec = {
-  kind: "grid-9",
-  cells: [titikBingkai, titikBingkai, titikBingkai, titikBingkai, "?", titikBingkai, mesin, titikBingkai, titikBingkai],
-};
-const pola6: VisualSpec = {
-  kind: "series",
-  cells: [
-    { shapes: [{ zigzag: { peaks: 5, amp: 20 } }] },
-    { shapes: [{ zigzag: { peaks: 4, amp: 20 } }] },
-    { shapes: [{ zigzag: { peaks: 3, amp: 20 } }] },
+    { shapes: [FiguralShape.circle(32, { fill: "outline" })] },
+    { shapes: [FiguralShape.circle(32, { fill: "solid" })] },
+    { shapes: [heartGlyph.shapes[0]] },
     "?",
   ],
 };
 
-const CONTOH: { judul: string; spec: VisualSpec }[] = [
-  { judul: "Pola 1 — Deret (rotasi/tangga, tanda ?)", spec: pola1 },
-  { judul: "Pola 1 — Deret (zigzag menurun)", spec: pola6 },
-  { judul: "Pola 2 — Analogi (nested + fill bertukar)", spec: pola2 },
-  { judul: "Pola 3 — Odd-One-Out (orientasi salah di D)", spec: pola3 },
-  { judul: "Pola 4 — Jaring-jaring kubus", spec: pola4 },
-  { judul: "Varian — Grid 9 kotak (komposit mesin)", spec: pola5 },
+const CONTOH: { judul: string; deskripsi: string; spec: VisualSpec }[] = [
+  {
+    judul: "1. Raven's Progressive Matrix — Roda Juring 8 Bagian Berputar (Rotasi 45°)",
+    deskripsi: "Menggunakan primitif sector & pieWheel dengan arsiran diagonal dan solid.",
+    spec: polaWheelSeries,
+  },
+  {
+    judul: "2. Matriks 3x3 dengan Dua Tanda Tanya (Pola Asli Buku Al Faiz)",
+    deskripsi: "Mendukung dua sel hilang ('?') di tengah dan kanan bawah tanpa error.",
+    spec: grid9WithTwoMissing,
+  },
+  {
+    judul: "3. Analogi Visual dengan Kurva Bézier Bebas (Bentuk Hati)",
+    deskripsi: "Menggunakan primitif path SVG presisi untuk bentuk organik non-poligon.",
+    spec: polaAnalogy,
+  },
 ];
 
 export default function FiguralTestPage() {
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-8 p-6">
       <div>
-        <h1 className="text-2xl font-bold">Tes Renderer Figural</h1>
-        <p className="text-sm text-muted-foreground">
-          Pratinjau keempat pola dari spesifikasi vektor — acuan kontrak bagi agent ekstraksi.
+        <h1 className="text-2xl font-bold tracking-tight">Suite Modul Figural Standar Internasional</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Implementasi geometri presisi tinggi: Raven&apos;s Progressive Matrices, Cattell Culture Fair, dan WAIS Matrix Reasoning.
         </p>
       </div>
-      {CONTOH.map(({ judul, spec }) => (
-        <div key={judul} className="space-y-2 rounded-lg border p-4">
-          <p className="text-sm font-semibold">{judul}</p>
-          <div className="rounded-lg bg-muted/40 p-3">
+
+      {CONTOH.map(({ judul, deskripsi, spec }) => (
+        <div key={judul} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
+          <div>
+            <p className="font-semibold text-foreground">{judul}</p>
+            <p className="text-xs text-muted-foreground">{deskripsi}</p>
+          </div>
+          <div className="rounded-lg bg-muted/40 p-4">
             <VisualPanel spec={spec} />
           </div>
         </div>
       ))}
+
+      {/* Pratinjau Opsi Jawaban Bertingkat (Dual-V) */}
+      <div className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
+        <div>
+          <p className="font-semibold text-foreground">
+            4. Pratinjau Opsi Jawaban Bertingkat (Dual-Cell Stacked Option)
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Merender sepasang kotak atas-bawah secara proporsional untuk soal yang memiliki dua tanda tanya.
+          </p>
+        </div>
+        <div className="flex items-center gap-4 rounded-lg bg-muted/40 p-4">
+          <span className="text-sm font-bold">Opsi A:</span>
+          <GlyphPanelOption glyph={dualOptionSample} />
+        </div>
+      </div>
     </div>
   );
 }
