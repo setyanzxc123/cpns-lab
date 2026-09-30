@@ -10,6 +10,7 @@ import { CATEGORY_INFO } from "@/data/bank";
 import { formatTime } from "@/hooks/use-exam";
 import { localStore } from "@/lib/storage";
 import { VisualPanel } from "@/components/figural";
+import { QuestionText } from "@/components/question-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -518,7 +519,10 @@ function ReviewCard({
           )}
         </div>
 
-        <p className="text-sm font-medium leading-relaxed">{q.text}</p>
+        <QuestionText
+          text={q.text}
+          className="text-sm font-medium leading-relaxed"
+        />
 
         {q.visual && (
           <div className="rounded bg-muted/40 p-2">

@@ -9,6 +9,7 @@ import { sampleQuestions } from "@/data/bank";
 import { computeSubScores, formatTime, useCountdown } from "@/hooks/use-exam";
 import { localStore } from "@/lib/storage";
 import { GlyphPanelOption, VisualPanel } from "@/components/figural";
+import { QuestionText } from "@/components/question-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -336,7 +337,10 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
             </div>
           </div>
 
-          <p className="text-base leading-relaxed font-medium">{q.text}</p>
+          <QuestionText
+            text={q.text}
+            className="text-base leading-relaxed font-medium"
+          />
 
           {q.visual && (
             <div className="rounded-lg bg-muted/40 p-3">
