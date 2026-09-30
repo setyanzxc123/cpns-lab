@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadBank, BUILT_IN_QUESTIONS } from "@/data/bank";
+import { loadBank } from "@/data/bank";
 import { getRepo } from "@/lib/repository";
 import type { Question } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,12 @@ export default function BankPage() {
       const repo = await getRepo();
       setCustom(await repo.listCustomQuestions());
     })();
+    // Bank di-refresh dari server di latar — ikuti pembaruannya.
+    const onBankUpdated = () => {
+      void loadBank().then(setBank);
+    };
+    window.addEventListener("cpns:bank-updated", onBankUpdated);
+    return () => window.removeEventListener("cpns:bank-updated", onBankUpdated);
   }, []);
 
   async function exportBank() {
@@ -86,9 +92,17 @@ export default function BankPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Bank Soal</h1>
-        <p className="text-sm text-muted-foreground">
-          {bank.length} soal tersedia ({BUILT_IN_QUESTIONS.length} bawaan + {custom.length} kustom).
-        </p>
+        {bank.length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {bank.length} soal tersedia ({custom.length} kustom).
+          </p>
+        ) : (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            Bank soal diambil dari server — butuh koneksi internet pada kunjungan
+            pertama. Saat ini bank masih kosong atau perangkat sedang offline;
+            soal kustom lokal tetap dapat dipakai.
+          </p>
+        )}
       </div>
 
       <Card>

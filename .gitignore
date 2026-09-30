@@ -43,3 +43,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Soal hasil ekstraksi buku berhak cipta (pakai pribadi) — DILARANG di-commit.
+# File tetap ada di disk lokal; di-seed ke Supabase via scripts/seed-questions.mjs.
+/src/data/extracted/
+
+# Panduan ekstraksi internal (konteks soal berhak cipta) — tidak untuk repo publik
+/AGENTS-2.md

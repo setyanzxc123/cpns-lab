@@ -30,18 +30,25 @@ export type SubCategory =
   | "Kalimat Efektif"
   | "Integritas"
   | "Bela Negara"
-  // TIU
-  | "Verbal"
-  | "Numerik"
+  | "Anti Radikalisme"
+  // TIU (nama tema buku bank soal Al Faiz)
+  | "Pecahan dan Desimal"
+  | "Hubungan X dan Y"
+  | "Analogi Kata dan Kalimat"
+  | "Pola Kalimat"
+  | "Silogisme"
+  | "Pola Bilangan"
+  | "Perbandingan Senilai dan Tak Senilai"
+  | "Figural 9 Kotak"
   | "Figural"
-  | "Logika"
+  | "Penalaran Analitis"
+  | "Tabel"
   // TKP
   | "Pelayanan Publik"
-  | "Jejaring Kerja"
-  | "Sosial Budaya"
-  | "Teknologi Informasi"
   | "Profesionalisme"
-  | "Anti Radikalisme";
+  | "Jejaring Kerja"
+  | "Teknologi Informasi dan Komunikasi"
+  | "Sosial Budaya";
 
 /** Mode pengisian bentuk: penuh, garis tepi saja, atau arsiran diagonal. */
 export type Fill = "solid" | "outline" | "hatch";

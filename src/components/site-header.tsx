@@ -34,6 +34,11 @@ import {
 import { toast } from "sonner";
 import { syncGuestToCloud } from "@/lib/sync";
 import { localStore } from "@/lib/storage";
+import {
+  pushPending,
+  getUnsyncedCount,
+  PROGRESS_CHANGED_EVENT,
+} from "@/lib/auto-sync";
 
 const NAV = [
   { href: "/", label: "Beranda", icon: LayoutDashboard },
@@ -49,12 +54,26 @@ export function SiteHeader() {
   const [user, setUser] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     if (!supabaseConfigured()) return;
     const sb = createClient();
+
+    // Auto-sync antrean progres: app dibuka / kembali online / selesai ujian /
+    // interval ringan. pushPending sendiri memeriksa online + login + antrean.
+    const triggerAutoSync = () => {
+      setPendingCount(getUnsyncedCount());
+      void pushPending()
+        .then(() => setPendingCount(getUnsyncedCount()))
+        .catch(() => {});
+    };
+    window.addEventListener("online", triggerAutoSync);
+    window.addEventListener(PROGRESS_CHANGED_EVENT, triggerAutoSync);
+    const interval = window.setInterval(triggerAutoSync, 5 * 60 * 1000);
+    triggerAutoSync();
 
     async function checkAndSync(userEmail: string | null) {
       setUser(userEmail);
@@ -81,7 +100,12 @@ export function SiteHeader() {
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
       void checkAndSync(session?.user?.email ?? null);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      sub.subscription.unsubscribe();
+      window.removeEventListener("online", triggerAutoSync);
+      window.removeEventListener(PROGRESS_CHANGED_EVENT, triggerAutoSync);
+      window.clearInterval(interval);
+    };
   }, []);
 
   async function handleManualSync() {
@@ -184,15 +208,29 @@ export function SiteHeader() {
                 type="button"
                 onClick={handleManualSync}
                 disabled={syncing}
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer"
-                title="Tersinkronisasi ke cloud. Klik untuk sinkronisasi manual."
+                className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                  pendingCount > 0
+                    ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+                    : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                }`}
+                title={
+                  pendingCount > 0
+                    ? `${pendingCount} sesi menunggu sinkronisasi. Klik untuk sinkron manual.`
+                    : "Tersinkronisasi ke cloud. Klik untuk sinkronisasi manual."
+                }
               >
                 {syncing ? (
-                  <RefreshCw className="h-3 w-3 animate-spin text-emerald-600 dark:text-emerald-400" />
+                  <RefreshCw className="h-3 w-3 animate-spin" />
                 ) : (
-                  <Cloud className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  <Cloud className="h-3 w-3" />
                 )}
-                <span>{syncing ? "Sinkronisasi..." : "Cloud"}</span>
+                <span>
+                  {syncing
+                    ? "Sinkronisasi..."
+                    : pendingCount > 0
+                      ? `Cloud · ${pendingCount} tertunda`
+                      : "Cloud"}
+                </span>
               </button>
             ) : (
               <div

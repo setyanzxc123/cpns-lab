@@ -187,3 +187,36 @@ create policy "Users can delete own custom questions"
   on public.custom_questions for delete
   to authenticated
   using (auth.uid() = user_id);
+
+-- Update policy exam_sessions: dibutuhkan upsert auto-sync (last-write-wins
+-- per sesi id sama antar perangkat).
+drop policy if exists "Users can update own exam sessions" on public.exam_sessions;
+create policy "Users can update own exam sessions"
+  on public.exam_sessions for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- =============================================================================
+-- 4. TABEL: questions (Bank soal bersama — sumber kebenaran aplikasi)
+-- Diisi via seed lokal (scripts/seed-questions.mjs) memakai SERVICE_ROLE key.
+-- Baca publik agar app (anon pun) bisa memuat bank; tulis TANPA policy →
+-- hanya service_role yang bisa insert/update/delete.
+-- =============================================================================
+create table if not exists public.questions (
+  id text primary key,               -- "ALF-TWK1-001"
+  category text not null,            -- TWK | TIU | TKP
+  sub text not null,                 -- subkategori/tema
+  payload jsonb not null,            -- objek Question lengkap (text, options, answer/points, explanation, visual?)
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_questions_category on public.questions (category, id);
+
+alter table public.questions enable row level security;
+
+drop policy if exists "Public read questions" on public.questions;
+create policy "Public read questions"
+  on public.questions for select
+  to anon, authenticated
+  using (true);

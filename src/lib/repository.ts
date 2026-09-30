@@ -7,6 +7,7 @@ import type { Question, SessionResult } from "./types";
 import { localStore } from "./storage";
 import { createClient } from "@/lib/supabase/client";
 import { syncGuestToCloud } from "./sync";
+import { notifyProgressChanged } from "./auto-sync";
 
 export { syncGuestToCloud };
 
@@ -28,6 +29,7 @@ export const localRepo: Repository = {
   },
   async saveResult(r) {
     localStore.saveResult(r);
+    notifyProgressChanged(r.id);
   },
   async listWrong() {
     return localStore.getWrong();
@@ -68,6 +70,8 @@ class SupabaseRepo implements Repository {
       finished_at: new Date(r.finishedAt).toISOString(),
       payload: r,
     });
+    // Sudah tersimpan di cloud — cukup beri tahu UI; tidak perlu masuk antrean.
+    notifyProgressChanged();
   }
   async listWrong(): Promise<Record<string, number>> {
     const sb = createClient();

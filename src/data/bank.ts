@@ -1,13 +1,4 @@
 import type { Category, Question, SubCategory } from "@/lib/types";
-import { twkQuestions } from "./questions-twk";
-import { tiuQuestions } from "./questions-tiu";
-import { tkpQuestions } from "./questions-tkp";
-
-export const BUILT_IN_QUESTIONS: Question[] = [
-  ...twkQuestions,
-  ...tiuQuestions,
-  ...tkpQuestions,
-];
 
 export const CATEGORY_INFO: Record<
   Category,
@@ -36,27 +27,159 @@ export const SUB_BY_CATEGORY: Record<Category, SubCategory[]> = {
     "UUD 1945",
     "Bhinneka Tunggal Ika",
     "NKRI",
+    "Nasionalisme",
+    "Gagasan Utama",
+    "Kalimat Efektif",
     "Integritas",
     "Bela Negara",
     "Anti Radikalisme",
   ],
-  TIU: ["Verbal", "Numerik", "Figural", "Logika"],
+  TIU: [
+    "Pecahan dan Desimal",
+    "Hubungan X dan Y",
+    "Analogi Kata dan Kalimat",
+    "Pola Kalimat",
+    "Silogisme",
+    "Pola Bilangan",
+    "Perbandingan Senilai dan Tak Senilai",
+    "Figural 9 Kotak",
+    "Figural",
+    "Penalaran Analitis",
+    "Tabel",
+  ],
   TKP: [
     "Pelayanan Publik",
-    "Jejaring Kerja",
-    "Sosial Budaya",
-    "Teknologi Informasi",
     "Profesionalisme",
+    "Jejaring Kerja",
+    "Teknologi Informasi dan Komunikasi",
+    "Sosial Budaya",
     "Anti Radikalisme",
   ],
 };
 
-/** Muat bank soal: bawaan + soal kustom (localStorage). */
+// ---------------------------------------------------------------------------
+// Bank soal dari Supabase (tabel `questions`) dengan cache localStorage.
+// Offline-first: cache dipakai langsung bila ada; refresh server berjalan di
+// latar bila cache > 24 jam. Kunjungan pertama butuh internet.
+// ---------------------------------------------------------------------------
+
+const K_BANK_CACHE = "cpns.bankCache";
+const STALE_MS = 24 * 60 * 60 * 1000;
+
+interface BankCache {
+  questions: Question[];
+  fetchedAt: string;
+}
+
+function isQuestion(x: unknown): x is Question {
+  const q = x as Question;
+  return Boolean(
+    q &&
+      typeof q.id === "string" &&
+      (q.category === "TWK" || q.category === "TIU" || q.category === "TKP") &&
+      typeof q.text === "string" &&
+      Array.isArray(q.options) &&
+      q.options.length >= 2,
+  );
+}
+
+function readCache(): BankCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(K_BANK_CACHE);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as BankCache;
+    if (!c || !Array.isArray(c.questions) || c.questions.some((q) => !isQuestion(q))) {
+      return null;
+    }
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(questions: Question[]) {
+  if (typeof window === "undefined") return;
+  const c: BankCache = { questions, fetchedAt: new Date().toISOString() };
+  try {
+    window.localStorage.setItem(K_BANK_CACHE, JSON.stringify(c));
+  } catch {
+    // localStorage penuh — abaikan, cache tidak kritikal
+  }
+}
+
+function isOnline(): boolean {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+async function fetchFromSupabase(): Promise<Question[] | null> {
+  try {
+    const { createClient } = await import("@/lib/supabase/client");
+    const sb = createClient();
+    const { data, error } = await sb
+      .from("questions")
+      .select("payload")
+      .order("id", { ascending: true });
+    if (error) return null;
+    return (data ?? []).map((r) => r.payload as Question).filter(isQuestion);
+  } catch {
+    return null;
+  }
+}
+
+async function refreshCacheInBackground() {
+  const fresh = await fetchFromSupabase();
+  if (fresh && fresh.length > 0) {
+    writeCache(fresh);
+    window.dispatchEvent(new CustomEvent("cpns:bank-updated"));
+  }
+}
+
+function dedupeById(qs: Question[]): Question[] {
+  const seen = new Set<string>();
+  const out: Question[] = [];
+  for (const q of qs) {
+    if (!seen.has(q.id)) {
+      seen.add(q.id);
+      out.push(q);
+    }
+  }
+  return out;
+}
+
+/** Muat bank soal (Supabase cache-first) + soal kustom (localStorage). */
 export async function loadBank(): Promise<Question[]> {
   const { getRepo } = await import("@/lib/repository");
   const repo = await getRepo();
   const custom = await repo.listCustomQuestions().catch(() => []);
-  return [...BUILT_IN_QUESTIONS, ...custom];
+
+  const cache = readCache();
+  const stale = !cache || Date.now() - Date.parse(cache.fetchedAt) > STALE_MS;
+
+  // Cache ada → pakai langsung (offline-safe). Kalau basi, segarkan di latar.
+  if (cache) {
+    if (stale && isOnline()) void refreshCacheInBackground();
+    return dedupeById([...cache.questions, ...custom]);
+  }
+
+  // Tanpa cache → butuh internet (kunjungan pertama).
+  if (isOnline()) {
+    const fresh = await fetchFromSupabase();
+    if (fresh && fresh.length > 0) {
+      writeCache(fresh);
+      return dedupeById([...fresh, ...custom]);
+    }
+    // Server kosong (belum di-seed) atau fetch gagal — jangan cache, biar
+    // percobaan berikutnya mencoba lagi.
+  }
+
+  // Offline & tanpa cache: hanya soal kustom lokal yang tersedia.
+  return custom;
+}
+
+/** Muat bank hanya dari cache localStorage (tanpa jaringan) — untuk latar cepat. */
+export function getCachedBank(): Question[] | null {
+  return readCache()?.questions ?? null;
 }
 
 /** Acak urutan (Fisher-Yates) tanpa memutasi array asli. */
