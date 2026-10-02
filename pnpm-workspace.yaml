@@ -1,6 +1,4 @@
 allowBuilds:
-  '@google/genai': set this to true or false
-  protobufjs: set this to true or false
   unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@ai-sdk/gateway@4.0.100'

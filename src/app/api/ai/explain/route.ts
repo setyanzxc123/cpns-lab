@@ -1,4 +1,5 @@
-import { getGenAI, GEMINI_MODEL_ID, generationConfig } from "@/lib/ai";
+import { generateText } from "ai";
+import { getGemini } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -78,15 +79,14 @@ Buat penjelasan maksimal 150 kata:
 3. Tips praktis agar tidak terkecoh jawaban mirip.`;
 
   try {
-    const interaction = await getGenAI().interactions.create({
-      model: GEMINI_MODEL_ID,
-      input: prompt,
-      system_instruction: SYSTEM_PROMPT,
-      generation_config: generationConfig(600),
-      store: false,
+    const { text } = await generateText({
+      ...getGemini(),
+      system: SYSTEM_PROMPT,
+      prompt,
+      maxOutputTokens: 600,
     });
 
-    return Response.json({ explanation: interaction.output_text ?? "" });
+    return Response.json({ explanation: text });
   } catch {
     return Response.json(
       { explanation: "Gagal memproses penjelasan dengan AI saat ini. Gunakan pembahasan resmi yang tertera." },

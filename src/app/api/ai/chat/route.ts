@@ -1,4 +1,5 @@
-import { getGenAI, GEMINI_MODEL_ID, generationConfig } from "@/lib/ai";
+import { streamText } from "ai";
+import { getGemini } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -24,58 +25,31 @@ export async function POST(req: Request) {
       parts?: Array<{ type: string; text?: string }>;
     }>;
   };
+  const messages = (body.messages ?? []).map((m) => {
+    const text =
+      m.content ??
+      m.parts
+        ?.filter((p) => p.type === "text" && typeof p.text === "string")
+        .map((p) => p.text)
+        .join("") ??
+      "";
+    return {
+      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: text,
+    };
+  });
 
-  // Riwayat multi-turn → Step sequence Interactions API (stateless, store=false)
-  const input = (body.messages ?? [])
-    .map((m) => {
-      const text =
-        m.content ??
-        m.parts
-          ?.filter((p) => p.type === "text" && typeof p.text === "string")
-          .map((p) => p.text)
-          .join("") ??
-        "";
-      return {
-        type: m.role === "assistant" ? ("model_output" as const) : ("user_input" as const),
-        content: [{ type: "text" as const, text }],
-      };
-    })
-    .filter((step) => step.content[0].text.trim().length > 0);
+  const result = streamText({
+    ...getGemini(),
+    system: SYSTEM,
+    messages,
+    maxOutputTokens: 2048,
+    onError: ({ error }) => {
+      // Jangan diamkan error upstream (mis. 429 kuota harian habis)
+      console.error("[ai/chat]", error);
+    },
+  });
 
-  try {
-    const stream = await getGenAI().interactions.create({
-      model: GEMINI_MODEL_ID,
-      input,
-      system_instruction: SYSTEM,
-      generation_config: generationConfig(2048),
-      store: false,
-      stream: true,
-    });
-
-    const encoder = new TextEncoder();
-    const textStream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        try {
-          for await (const event of stream) {
-            if (event.event_type === "step.delta" && event.delta.type === "text" && event.delta.text) {
-              controller.enqueue(encoder.encode(event.delta.text));
-            }
-          }
-        } catch {
-          // stream terputus — client melihat stream berakhir
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(textStream, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Gagal menghubungi Gemini. Periksa koneksi atau GEMINI_API_KEY." }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
-    );
-  }
+  // Protokol UIMessage: mendukung part reasoning (ringkasan proses berpikir)
+  return result.toUIMessageStreamResponse();
 }

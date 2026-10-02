@@ -1,4 +1,5 @@
-import { getGenAI, GEMINI_MODEL_ID, generationConfig } from "@/lib/ai";
+import { generateText } from "ai";
+import { getGemini } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -42,12 +43,11 @@ Soal salah tertunda: ${data.wrongCount}
 
 Bahasa Indonesia, maksimal 450 kata, langsung ke isi.`;
 
-  const interaction = await getGenAI().interactions.create({
-    model: GEMINI_MODEL_ID,
-    input: prompt,
-    generation_config: generationConfig(1200),
-    store: false,
+  const { text } = await generateText({
+    ...getGemini(),
+    prompt,
+    maxOutputTokens: 1200,
   });
 
-  return Response.json({ report: interaction.output_text ?? "" });
+  return Response.json({ report: text });
 }
