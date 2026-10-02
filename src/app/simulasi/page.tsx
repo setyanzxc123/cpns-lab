@@ -43,6 +43,11 @@ export default function SimulasiPage() {
 
   useEffect(() => {
     loadBank().then(setBank);
+    const onBankUpdated = () => {
+      void loadBank().then(setBank);
+    };
+    window.addEventListener("cpns:bank-updated", onBankUpdated);
+    return () => window.removeEventListener("cpns:bank-updated", onBankUpdated);
   }, []);
 
   const startExam = (c: ExamConfig) => {

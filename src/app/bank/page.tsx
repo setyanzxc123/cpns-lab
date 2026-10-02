@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadBank } from "@/data/bank";
+import { loadBank, forceRefreshBank, BANK_CACHE_VERSION } from "@/data/bank";
 import { getRepo } from "@/lib/repository";
 import type { Question } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Download, Upload, Trash2, Plus } from "lucide-react";
+import { Download, Upload, Trash2, Plus, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function BankPage() {
   const [bank, setBank] = useState<Question[]>([]);
   const [custom, setCustom] = useState<Question[]>([]);
   const [importText, setImportText] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -74,6 +75,19 @@ export default function BankPage() {
     setBank(await loadBank());
   }
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      const refreshed = await forceRefreshBank();
+      setBank(refreshed);
+      toast.success("Bank soal berhasil diperbarui dari server!");
+    } catch {
+      toast.error("Gagal memperbarui bank soal dari server.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   const SAMPLE = JSON.stringify(
     {
       id: "CUSTOM-001",
@@ -90,24 +104,36 @@ export default function BankPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">Bank Soal</h1>
-        {bank.length > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {bank.length} soal tersedia ({custom.length} kustom).
-          </p>
-        ) : (
-          <p className="text-sm text-amber-600 dark:text-amber-400">
-            Bank soal diambil dari server — butuh koneksi internet pada kunjungan
-            pertama. Saat ini bank masih kosong atau perangkat sedang offline;
-            soal kustom lokal tetap dapat dipakai.
-          </p>
-        )}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Bank Soal</h1>
+          {bank.length > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {bank.length} soal tersedia ({custom.length} kustom) • Versi Cache: {BANK_CACHE_VERSION}
+            </p>
+          ) : (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              Bank soal diambil dari server — butuh koneksi internet pada kunjungan
+              pertama. Saat ini bank masih kosong atau perangkat sedang offline;
+              soal kustom lokal tetap dapat dipakai.
+            </p>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="self-start sm:self-auto gap-2"
+        >
+          <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          {refreshing ? "Menyegarkan..." : "Segarkan Bank Soal"}
+        </Button>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-base">Impor / Ekspor</CardTitle>
+          <CardTitle className="text-base">Impor / Ekspor & Sinkronisasi</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
@@ -129,6 +155,10 @@ export default function BankPage() {
             </Button>
             <Button variant="outline" onClick={exportBank}>
               <Download className="h-4 w-4" /> Ekspor semua ({bank.length})
+            </Button>
+            <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+              <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Menyegarkan..." : "Segarkan dari Server"}
             </Button>
             <Button variant="ghost" onClick={() => setImportText(SAMPLE)}>
               <Plus className="h-4 w-4" /> Isi contoh format

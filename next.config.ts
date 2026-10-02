@@ -5,8 +5,10 @@ const withPWA = withPWAInit({
   dest: "public",
   register: true,
   disable: process.env.NODE_ENV === "development",
-  // Biarkan route API dan nav runtime tidak dicache
+  // Biarkan route API dan nav runtime tidak dicache, aktifkan pembaruan service worker instan
   workboxOptions: {
+    skipWaiting: true,
+    clientsClaim: true,
     navigateFallbackDenylist: [/^\/api\//],
   },
 });

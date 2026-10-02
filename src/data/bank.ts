@@ -63,10 +63,12 @@ export const SUB_BY_CATEGORY: Record<Category, SubCategory[]> = {
 // latar bila cache > 24 jam. Kunjungan pertama butuh internet.
 // ---------------------------------------------------------------------------
 
+export const BANK_CACHE_VERSION = "2.2.0-crops";
 const K_BANK_CACHE = "cpns.bankCache";
 const STALE_MS = 24 * 60 * 60 * 1000;
 
 interface BankCache {
+  version: string;
   questions: Question[];
   fetchedAt: string;
 }
@@ -88,11 +90,18 @@ function readCache(): BankCache | null {
   try {
     const raw = window.localStorage.getItem(K_BANK_CACHE);
     if (!raw) return null;
-    const c = JSON.parse(raw) as BankCache;
-    if (!c || !Array.isArray(c.questions) || c.questions.some((q) => !isQuestion(q))) {
+    const c = JSON.parse(raw) as Partial<BankCache>;
+    // Invalidate jika versi cache usang atau struktur data tidak valid
+    if (
+      !c ||
+      c.version !== BANK_CACHE_VERSION ||
+      !Array.isArray(c.questions) ||
+      c.questions.some((q) => !isQuestion(q))
+    ) {
+      window.localStorage.removeItem(K_BANK_CACHE);
       return null;
     }
-    return c;
+    return c as BankCache;
   } catch {
     return null;
   }
@@ -100,7 +109,11 @@ function readCache(): BankCache | null {
 
 function writeCache(questions: Question[]) {
   if (typeof window === "undefined") return;
-  const c: BankCache = { questions, fetchedAt: new Date().toISOString() };
+  const c: BankCache = {
+    version: BANK_CACHE_VERSION,
+    questions,
+    fetchedAt: new Date().toISOString(),
+  };
   try {
     window.localStorage.setItem(K_BANK_CACHE, JSON.stringify(c));
   } catch {
@@ -174,6 +187,24 @@ export async function loadBank(): Promise<Question[]> {
   }
 
   // Offline & tanpa cache: hanya soal kustom lokal yang tersedia.
+  return custom;
+}
+
+/** Memaksa hapus cache lokal dan mengambil ulang bank soal terbaru dari Supabase. */
+export async function forceRefreshBank(): Promise<Question[]> {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(K_BANK_CACHE);
+  }
+  const { getRepo } = await import("@/lib/repository");
+  const repo = await getRepo();
+  const custom = await repo.listCustomQuestions().catch(() => []);
+
+  const fresh = await fetchFromSupabase();
+  if (fresh && fresh.length > 0) {
+    writeCache(fresh);
+    window.dispatchEvent(new CustomEvent("cpns:bank-updated"));
+    return dedupeById([...fresh, ...custom]);
+  }
   return custom;
 }
 

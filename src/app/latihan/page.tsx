@@ -26,12 +26,19 @@ export default function LatihanPage() {
 
   useEffect(() => {
     loadBank().then(setBank);
+    const onBankUpdated = () => {
+      void loadBank().then(setBank);
+    };
+    window.addEventListener("cpns:bank-updated", onBankUpdated);
+
     (async () => {
       const { getRepo } = await import("@/lib/repository");
       const repo = await getRepo();
       const wrong = await repo.listWrong();
       setWrongIds(Object.keys(wrong));
     })();
+
+    return () => window.removeEventListener("cpns:bank-updated", onBankUpdated);
   }, []);
 
   const startExam = (c: ExamConfig) => {
