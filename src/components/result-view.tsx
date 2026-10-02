@@ -5,6 +5,7 @@
 // skor per subtes, review jawaban berfilter, dan tombol minta penjelasan AI.
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Question, SessionResult } from "@/lib/types";
 import { CATEGORY_INFO } from "@/data/bank";
 import { formatTime } from "@/hooks/use-exam";
@@ -511,12 +512,12 @@ function ReviewCard({
           <p className="mt-1 text-muted-foreground">{q.explanation}</p>
         </details>
 
-        <div>
+        <div className="space-y-2">
           {aiExplain ? (
             <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm leading-relaxed dark:border-purple-900/50 dark:bg-purple-950/30">
               <div className="mb-1 flex items-center justify-between text-xs font-semibold text-purple-800 dark:text-purple-300">
                 <span className="flex items-center gap-1">
-                  <Sparkles className="h-3.5 w-3.5" /> Penjelasan AI
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden /> Penjelasan AI
                 </span>
                 {fromCache && (
                   <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-normal text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
@@ -528,9 +529,19 @@ function ReviewCard({
             </div>
           ) : (
             <Button variant="outline" size="sm" onClick={askAi} disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
               Minta penjelasan AI
             </Button>
+          )}
+          {Boolean(process.env.NEXT_PUBLIC_HAS_GEMINI) && (
+            <div>
+              <Link
+                href={`/ai?q=${encodeURIComponent(q.id)}${choice != null ? `&c=${choice}` : ""}`}
+                className="text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Tanya lebih lanjut di chat →
+              </Link>
+            </div>
           )}
         </div>
       </CardContent>

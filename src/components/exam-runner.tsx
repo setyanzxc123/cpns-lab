@@ -4,6 +4,7 @@
 // navigasi grid) maupun latihan (feedback instan + pembahasan).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ExamConfig, Question, RunningExam, SessionResult } from "@/lib/types";
 import { sampleQuestions } from "@/data/bank";
 import { computeSubScores, formatTime, useCountdown } from "@/hooks/use-exam";
@@ -21,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Flag, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Flag, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Sparkles } from "lucide-react";
 
 const LETTERS = ["A", "B", "C", "D", "E"];
 
@@ -34,6 +35,8 @@ interface Props {
 }
 
 export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
+  const router = useRouter();
+  const aiOn = Boolean(process.env.NEXT_PUBLIC_HAS_GEMINI);
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [choices, setChoices] = useState<Record<string, number | null>>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
@@ -456,6 +459,20 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                 </p>
               )}
               <p className="text-muted-foreground">{q.explanation}</p>
+              {aiOn && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/ai?q=${encodeURIComponent(q.id)}${chosen != null ? `&c=${chosen}` : ""}`,
+                    )
+                  }
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                  Tanya lebih lanjut dengan AI
+                </button>
+              )}
             </div>
           )}
         </CardContent>
