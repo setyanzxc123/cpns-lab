@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { loadBank, CATEGORY_INFO } from "@/data/bank";
 import { getRepo } from "@/lib/repository";
+import { deriveProgress, subTrend, weeklyAccuracy } from "@/lib/progress";
 import type { Category, Question, SessionResult, SubCategory } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -53,6 +54,11 @@ export default function StatistikPage() {
     [wrong, bank],
   );
 
+  const progress = useMemo(
+    () => (bank.length > 0 ? deriveProgress(results, bank) : null),
+    [results, bank],
+  );
+
   async function clearWrong() {
     const repo = await getRepo();
     await repo.clearWrong();
@@ -91,6 +97,14 @@ export default function StatistikPage() {
             ...s,
             pct: Math.round((s.correct / Math.max(1, s.total)) * 100),
           })),
+          subMastery:
+            progress?.subMastery.map((m) => ({
+              sub: m.sub,
+              category: m.category,
+              acc: m.acc,
+              attempts: m.attempts,
+            })) ?? [],
+          weeklyAccuracy: weeklyAccuracy(results),
           wrongCount: Object.keys(wrong).length,
         }),
       });
@@ -108,16 +122,116 @@ export default function StatistikPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
-        <h1 className="text-2xl font-bold">Statistik &amp; Analisis Progres</h1>
+        <h1 className="text-2xl font-bold">Progres Belajar</h1>
         <p className="text-sm text-muted-foreground">
           Semakin sering berlatih, grafik ini yang menunjukkan area mana yang perlu diperkuat.
         </p>
       </div>
 
+      {progress?.focusSub && (
+        <p className="text-sm text-muted-foreground">
+          Fokus berikutnya:{" "}
+          <Link
+            href={`/latihan?cat=${progress.focusSub.category}&subs=${encodeURIComponent(progress.focusSub.sub)}`}
+            className="font-medium text-foreground underline-offset-2 hover:underline"
+          >
+            {progress.focusSub.sub} ({progress.focusSub.acc}%)
+          </Link>
+        </p>
+      )}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Kemampuan Saat Ini</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Akurasi berbobot — hasil terbaru berpengaruh lebih besar daripada hasil lama.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!progress || progress.subMastery.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Belum ada data. Kerjakan{" "}
+              <Link href="/latihan" className="text-blue-700 underline">
+                latihan
+              </Link>{" "}
+              atau{" "}
+              <Link href="/simulasi" className="text-blue-700 underline">
+                simulasi
+              </Link>{" "}
+              dulu.
+            </p>
+          ) : (
+            [...progress.subMastery]
+              .sort((a, b) => a.acc - b.acc)
+              .map((m) => (
+                <div key={m.sub}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="font-medium" style={{ color: CATEGORY_INFO[m.category].color }}>
+                      {m.sub}{" "}
+                      <span className="text-xs text-muted-foreground">({m.category})</span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      {m.acc}% · {m.attempts} jawaban
+                      {m.acc < 60 && <span className="ml-2 text-xs font-semibold text-red-600">perlu diperkuat</span>}
+                    </span>
+                  </div>
+                  <Progress value={m.acc} />
+                </div>
+              ))
+          )}
+        </CardContent>
+      </Card>
+
+      {progress && progress.subMastery.some((m) => m.attempts > 0) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Tren per Sub-materi</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Akurasi tiap sesi, lama ke baru. Arahkan kursor untuk detail.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {progress.subMastery
+              .filter((m) => m.attempts > 0)
+              .sort((a, b) => a.acc - b.acc)
+              .map((m) => {
+                const trend = subTrend(results, bank, m.sub).slice(-12);
+                return (
+                  <div key={m.sub} className="flex items-center gap-3">
+                    <span
+                      className="w-40 shrink-0 truncate text-sm font-medium"
+                      style={{ color: CATEGORY_INFO[m.category].color }}
+                      title={`${m.sub} (${m.category})`}
+                    >
+                      {m.sub}
+                    </span>
+                    <div className="flex h-8 flex-1 items-end gap-1">
+                      {trend.map((t, i) => (
+                        <div
+                          key={i}
+                          className="w-1.5 rounded-sm"
+                          style={{
+                            height: `${Math.max(8, t.pct * 0.28)}px`,
+                            backgroundColor: `color-mix(in oklab, ${CATEGORY_INFO[m.category].color} ${Math.max(25, t.pct)}%, transparent)`,
+                          }}
+                          title={`${t.label} — ${t.pct}%`}
+                        />
+                      ))}
+                    </div>
+                    <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
+                      {trend[trend.length - 1]?.pct ?? 0}%
+                    </span>
+                  </div>
+                );
+              })}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <BarChart3 className="h-4 w-4" /> Akurasi per Subkategori
+            <BarChart3 className="h-4 w-4" /> Akumulasi Semua Waktu
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">

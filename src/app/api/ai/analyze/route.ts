@@ -12,6 +12,8 @@ export interface AnalyzeInput {
     subScores: { category: string; correct: number; total: number; score: number; maxScore: number }[];
   }[];
   subAccuracy: { sub: string; category: string; correct: number; total: number; pct: number }[];
+  subMastery: { sub: string; category: string; acc: number; attempts: number }[];
+  weeklyAccuracy: { week: string; pct: number }[];
   wrongCount: number;
 }
 
@@ -36,11 +38,19 @@ export async function POST(req: Request) {
 Data riwayat (terbaru dulu):
 ${JSON.stringify(data.history.slice(0, 10))}
 
-Akurasi per subkategori:
+Akurasi per subkategori (akumulasi semua waktu):
 ${JSON.stringify(data.subAccuracy)}
+
+Kemampuan saat ini per sub (berbobot — hasil terbaru lebih dominan):
+${JSON.stringify(data.subMastery)}
+
+Akurasi mingguan (tren, lama → baru):
+${JSON.stringify(data.weeklyAccuracy)}
 
 Soal salah tertunda: ${data.wrongCount}
 
+Bahas tren mingguan dan perbandingan kemampuan berbobot vs akumulasi dalam
+analisismu (mis. "naik/turun", "membaik", "perlu dipertahankan").
 Bahasa Indonesia, maksimal 450 kata, langsung ke isi.`;
 
   const { text } = await generateText({

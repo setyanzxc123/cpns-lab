@@ -28,7 +28,7 @@ const NAV = [
   { href: "/", label: "Beranda", icon: LayoutDashboard },
   { href: "/simulasi", label: "Simulasi", icon: Timer },
   { href: "/latihan", label: "Latihan", icon: BookOpen },
-  { href: "/statistik", label: "Statistik", icon: BarChart3 },
+  { href: "/statistik", label: "Progres", icon: BarChart3 },
   { href: "/ai", label: "Tutor AI", icon: Bot },
 ];
 
