@@ -31,6 +31,23 @@ export default function LatihanPage() {
     };
     window.addEventListener("cpns:bank-updated", onBankUpdated);
 
+    // Deep-link: ?cat=TIU&subs=Pola Bilangan,Figural — prakonfigurasi paket
+    // dari tautan "Fokus berikutnya" di Beranda. Nilai tak dikenal diabaikan.
+    const params = new URLSearchParams(window.location.search);
+    const catParam = params.get("cat");
+    const selectedCat: Category =
+      catParam === "TWK" || catParam === "TIU" || catParam === "TKP" ? catParam : "TWK";
+    if (catParam) setCat(selectedCat);
+    const subsParam = params.get("subs");
+    if (subsParam) {
+      const valid = new Set<string>(SUB_BY_CATEGORY[selectedCat]);
+      const picked = subsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => valid.has(s));
+      if (picked.length > 0) setSubs(picked as SubCategory[]);
+    }
+
     (async () => {
       const { getRepo } = await import("@/lib/repository");
       const repo = await getRepo();

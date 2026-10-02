@@ -3,48 +3,44 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { getRepo } from "@/lib/repository";
 import { loadBank } from "@/data/bank";
-import type { SessionResult } from "@/lib/types";
-import { Timer, BookOpen } from "lucide-react";
+import { deriveProgress, type Progress } from "@/lib/progress";
+import { ArrowDownRight, ArrowUpRight, BookOpen, Timer } from "lucide-react";
+
+function Highlight({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <p className="text-2xl font-bold tracking-tight">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}
 
 export default function HomePage() {
-  const [results, setResults] = useState<SessionResult[]>([]);
-  const [bankCount, setBankCount] = useState(0);
-  const [dbOn, setDbOn] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
 
   useEffect(() => {
     (async () => {
       const repo = await getRepo();
-      setResults(await repo.listResults());
-      setBankCount((await loadBank()).length);
-      setDbOn(Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL));
+      const [results, bank] = await Promise.all([repo.listResults(), loadBank()]);
+      setProgress(deriveProgress(results, bank));
     })();
   }, []);
 
-  const avg = results.length
-    ? Math.round(
-        (results.reduce((a, r) => a + r.totalScore / Math.max(1, r.maxScore), 0) /
-          results.length) *
-          100,
-      )
-    : null;
+  const delta = progress?.delta ?? null;
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-600 px-6 py-10 text-white">
-        <h1 className="text-3xl font-bold sm:text-4xl">Siap tempur tes CPNS?</h1>
-        <p className="mt-2 max-w-xl text-blue-100">
-          Latihan TWK, TIU, dan TKP dengan pembahasan lengkap, simulasi ujian berwaktu
-          ala CAT BKN, analisis kelemahan, dan tutor AI yang membantu belajar lebih fokus.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
+    <div className="space-y-8">
+      <section className="rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-600 px-6 py-8 text-white">
+        <h1 className="text-2xl font-bold sm:text-3xl">Siap belajar hari ini?</h1>
+        <div className="mt-4 flex flex-wrap gap-3">
           <Link
             href="/simulasi"
             className={cn(
               buttonVariants({ size: "lg" }),
-              "bg-white text-blue-800 hover:bg-blue-50"
+              "bg-white text-blue-800 hover:bg-blue-50",
             )}
           >
             <Timer className="h-5 w-5" /> Mulai Simulasi
@@ -53,7 +49,7 @@ export default function HomePage() {
             href="/latihan"
             className={cn(
               buttonVariants({ size: "lg", variant: "outline" }),
-              "border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              "border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white",
             )}
           >
             <BookOpen className="h-5 w-5" /> Latihan Soal
@@ -61,27 +57,77 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border bg-card px-5 py-4">
-        <p className="text-sm">
-          <span className="text-xl font-bold">{bankCount}</span>{" "}
-          <span className="text-muted-foreground">soal tersedia</span>
-        </p>
-        <p className="text-sm">
-          <span className="text-xl font-bold">{results.length}</span>{" "}
-          <span className="text-muted-foreground">sesi dikerjakan</span>
-        </p>
-        <p className="text-sm">
-          <span className="text-xl font-bold">{avg !== null ? `${avg}%` : "—"}</span>{" "}
-          <span className="text-muted-foreground">rata-rata capaian</span>
+      <section className="space-y-4">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold">Sorotan Progres</h2>
+          <Link
+            href="/statistik"
+            className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            Lihat progres lengkap →
+          </Link>
+        </div>
+
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-4">
+          <Highlight
+            value={progress ? String(progress.totalSessions) : "—"}
+            label="sesi dikerjakan"
+          />
+          <Highlight
+            value={progress ? String(progress.totalQuestions) : "—"}
+            label="soal dikerjakan"
+          />
+          <div>
+            <p className="flex items-center gap-1.5 text-2xl font-bold tracking-tight">
+              {progress?.accuracy7d != null ? `${progress.accuracy7d}%` : "—"}
+              {delta != null && delta !== 0 && (
+                <span
+                  className={cn(
+                    "flex items-center text-xs font-semibold",
+                    delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
+                  )}
+                  title="Selisih akurasi 7 hari vs 30 hari"
+                >
+                  {delta > 0 ? (
+                    <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                  ) : (
+                    <ArrowDownRight className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                  {Math.abs(delta)}%
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">akurasi 7 hari terakhir</p>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          {progress?.focusSub ? (
+            <>
+              Fokus berikutnya:{" "}
+              <Link
+                href={`/latihan?cat=${progress.focusSub.category}&subs=${encodeURIComponent(progress.focusSub.sub)}`}
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                {progress.focusSub.sub} ({progress.focusSub.acc}%)
+              </Link>
+            </>
+          ) : progress ? (
+            <>
+              Belum ada cukup data untuk rekomendasi —{" "}
+              <Link
+                href="/latihan"
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                mulai latihan pertamamu
+              </Link>
+              .
+            </>
+          ) : (
+            "Memuat progres…"
+          )}
         </p>
       </section>
-
-      <p className="text-xs text-muted-foreground">
-        Penyimpanan{" "}
-        {dbOn
-          ? "terhubung ke Supabase — progres tersinkron antar perangkat."
-          : "di perangkat ini — pasang Supabase untuk sinkron antar perangkat."}
-      </p>
     </div>
   );
 }
