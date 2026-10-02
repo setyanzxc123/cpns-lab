@@ -14,16 +14,13 @@ import {
   BarChart3,
   Bot,
   LogOut,
-  Cloud,
   HardDrive,
-  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { syncGuestToCloud } from "@/lib/sync";
 import { localStore } from "@/lib/storage";
 import {
   pushPending,
-  getUnsyncedCount,
   PROGRESS_CHANGED_EVENT,
 } from "@/lib/auto-sync";
 
@@ -39,8 +36,6 @@ const NAV = [
 export function SiteHeader() {
   const pathname = usePathname();
   const [user, setUser] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -51,10 +46,7 @@ export function SiteHeader() {
     // Auto-sync antrean progres: app dibuka / kembali online / selesai ujian /
     // interval ringan. pushPending sendiri memeriksa online + login + antrean.
     const triggerAutoSync = () => {
-      setPendingCount(getUnsyncedCount());
-      void pushPending()
-        .then(() => setPendingCount(getUnsyncedCount()))
-        .catch(() => {});
+      void pushPending().catch(() => {});
     };
     window.addEventListener("online", triggerAutoSync);
     window.addEventListener(PROGRESS_CHANGED_EVENT, triggerAutoSync);
@@ -64,7 +56,6 @@ export function SiteHeader() {
     async function checkAndSync(userEmail: string | null) {
       setUser(userEmail);
       if (userEmail && localStore.hasGuestData()) {
-        setSyncing(true);
         try {
           const res = await syncGuestToCloud();
           if (res.success && res.sessionsCount > 0) {
@@ -74,8 +65,6 @@ export function SiteHeader() {
           }
         } catch {
           // Keep local data safe on failure
-        } finally {
-          setSyncing(false);
         }
       }
     }
@@ -93,29 +82,6 @@ export function SiteHeader() {
       window.clearInterval(interval);
     };
   }, []);
-
-  async function handleManualSync() {
-    if (syncing || !user) return;
-    setSyncing(true);
-    try {
-      const res = await syncGuestToCloud();
-      if (res.success) {
-        if (res.sessionsCount > 0) {
-          toast.success(
-            `Data berhasil disinkronkan: ${res.sessionsCount} sesi.`,
-          );
-        } else {
-          toast.info("Semua data lokal telah tersinkronisasi ke cloud.");
-        }
-      } else if (res.message) {
-        toast.info(res.message);
-      }
-    } catch {
-      toast.error("Gagal menyinkronkan data ke cloud.");
-    } finally {
-      setSyncing(false);
-    }
-  }
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -146,53 +112,15 @@ export function SiteHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <ThemeToggle />
-          {mounted && (
-            user ? (
-              <button
-                type="button"
-                onClick={handleManualSync}
-                disabled={syncing}
-                className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                  pendingCount > 0
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
-                    : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-                }`}
-                title={
-                  pendingCount > 0
-                    ? `${pendingCount} sesi menunggu sinkronisasi. Klik untuk sinkron manual.`
-                    : "Tersinkronisasi ke cloud. Klik untuk sinkronisasi manual."
-                }
-                aria-label={`Sinkronisasi cloud: ${
-                  syncing
-                    ? "sedang menyinkronkan"
-                    : pendingCount > 0
-                      ? `${pendingCount} sesi menunggu, klik untuk sinkron manual`
-                      : "tersinkronisasi, klik untuk sinkron manual"
-                }`}
-              >
-                {syncing ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Cloud className="h-3 w-3" />
-                )}
-                <span>
-                  {syncing
-                    ? "Sinkronisasi..."
-                    : pendingCount > 0
-                      ? `${pendingCount} tertunda`
-                      : "Tersinkron"}
-                </span>
-              </button>
-            ) : !supabaseConfigured() && process.env.NODE_ENV === "development" ? (
-              <div
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-muted bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
-                title="Env Supabase tidak terpasang — data hanya di browser ini"
-              >
-                <HardDrive className="h-3 w-3" aria-hidden />
-                <span>Mode Dev</span>
-              </div>
-            ) : null
-          )}
+          {mounted && !user && !supabaseConfigured() && process.env.NODE_ENV === "development" ? (
+            <div
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-muted bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+              title="Env Supabase tidak terpasang — data hanya di browser ini"
+            >
+              <HardDrive className="h-3 w-3" aria-hidden />
+              <span>Mode Dev</span>
+            </div>
+          ) : null}
           {mounted && supabaseConfigured() && user ? (
             <>
               <span className="hidden text-xs text-muted-foreground sm:inline">{user}</span>

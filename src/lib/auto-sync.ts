@@ -40,11 +40,6 @@ export function notifyProgressChanged(sessionId?: string) {
   window.dispatchEvent(new CustomEvent(PROGRESS_CHANGED_EVENT));
 }
 
-/** Jumlah sesi yang belum terkonfirmasi tersinkron. */
-export function getUnsyncedCount(): number {
-  return readQueue().length;
-}
-
 export interface PushResult {
   /** null = tidak mencoba (offline / belum login / tanpa env). */
   attempted: boolean;
