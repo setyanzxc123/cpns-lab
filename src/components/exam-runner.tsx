@@ -210,7 +210,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
         <CardContent className="p-8 text-center space-y-2">
           <p className="font-medium">Tidak ada soal yang cocok dengan konfigurasi ini.</p>
           <p className="text-sm text-muted-foreground">
-            Coba kurangi jumlah soal atau tambahkan bank soal di menu Bank Soal.
+            Coba kurangi jumlah soal.
           </p>
           {onAbort && (
             <Button variant="outline" onClick={onAbort} className="mt-2">

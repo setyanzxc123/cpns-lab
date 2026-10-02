@@ -7,7 +7,6 @@ export interface SyncResult {
   success: boolean;
   sessionsCount: number;
   wrongCount: number;
-  customCount: number;
   message?: string;
 }
 
@@ -16,7 +15,6 @@ export async function syncGuestToCloud(): Promise<SyncResult> {
     success: true,
     sessionsCount: 0,
     wrongCount: 0,
-    customCount: 0,
   };
 
   if (!localStore.hasGuestData()) {
@@ -30,7 +28,6 @@ export async function syncGuestToCloud(): Promise<SyncResult> {
       success: false,
       sessionsCount: 0,
       wrongCount: 0,
-      customCount: 0,
       message: "Supabase client not configured",
     };
   }
@@ -42,7 +39,6 @@ export async function syncGuestToCloud(): Promise<SyncResult> {
       success: false,
       sessionsCount: 0,
       wrongCount: 0,
-      customCount: 0,
       message: "User not authenticated",
     };
   }
@@ -50,11 +46,9 @@ export async function syncGuestToCloud(): Promise<SyncResult> {
   const user = authData.user;
   const localSessions = localStore.getResults();
   const localWrong = localStore.getWrong();
-  const localCustom = localStore.getCustomQuestions();
 
   let insertedSessions = 0;
   let syncedWrong = 0;
-  let insertedCustom = 0;
 
   if (localSessions.length > 0) {
     const { data: existingSessions, error: sesErr } = await sb
@@ -107,30 +101,6 @@ export async function syncGuestToCloud(): Promise<SyncResult> {
     syncedWrong = wrongRows.length;
   }
 
-  if (localCustom.length > 0) {
-    const { data: cloudCustom, error: cErr } = await sb
-      .from("custom_questions")
-      .select("question_id");
-    if (cErr) throw cErr;
-
-    const existingCustomIds = new Set((cloudCustom ?? []).map((q) => q.question_id));
-    const toInsert = localCustom
-      .filter((q) => !existingCustomIds.has(q.id))
-      .map((q) => ({
-        user_id: user.id,
-        question_id: q.id,
-        payload: q,
-      }));
-
-    if (toInsert.length > 0) {
-      const { error: cInsErr } = await sb
-        .from("custom_questions")
-        .upsert(toInsert, { onConflict: "user_id,question_id" });
-      if (cInsErr) throw cInsErr;
-      insertedCustom = toInsert.length;
-    }
-  }
-
   localStore.clearGuestData();
   localStore.setLastSync(new Date().toISOString());
 
@@ -138,6 +108,5 @@ export async function syncGuestToCloud(): Promise<SyncResult> {
     success: true,
     sessionsCount: insertedSessions,
     wrongCount: syncedWrong,
-    customCount: insertedCustom,
   };
 }

@@ -204,11 +204,7 @@ export default function SimulasiPage() {
               ))}
             </ul>
             <p className="mt-1 text-xs">
-              Soal yang tersedia tetap akan dipakai, atau tambahkan soal di menu{" "}
-              <Link href="/bank" className="font-medium underline underline-offset-2">
-                Bank Soal
-              </Link>
-              .
+              Soal yang tersedia tetap akan dipakai.
             </p>
           </div>
         </div>

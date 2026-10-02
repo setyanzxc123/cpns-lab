@@ -12,7 +12,6 @@ import {
   Timer,
   BookOpen,
   BarChart3,
-  Library,
   Bot,
   LogOut,
   Cloud,
@@ -33,7 +32,6 @@ const NAV = [
   { href: "/simulasi", label: "Simulasi", icon: Timer },
   { href: "/latihan", label: "Latihan", icon: BookOpen },
   { href: "/statistik", label: "Statistik", icon: BarChart3 },
-  { href: "/bank", label: "Bank Soal", icon: Library },
   { href: "/ai", label: "Tutor AI", icon: Bot },
 ];
 
@@ -69,9 +67,9 @@ export function SiteHeader() {
         setSyncing(true);
         try {
           const res = await syncGuestToCloud();
-          if (res.success && (res.sessionsCount > 0 || res.customCount > 0)) {
+          if (res.success && res.sessionsCount > 0) {
             toast.success(
-              `Data sesi tamu berhasil disinkronkan ke cloud: ${res.sessionsCount} sesi, ${res.customCount} soal kustom.`,
+              `Data sesi tamu berhasil disinkronkan ke cloud: ${res.sessionsCount} sesi.`,
             );
           }
         } catch {
@@ -102,9 +100,9 @@ export function SiteHeader() {
     try {
       const res = await syncGuestToCloud();
       if (res.success) {
-        if (res.sessionsCount > 0 || res.customCount > 0) {
+        if (res.sessionsCount > 0) {
           toast.success(
-            `Data berhasil disinkronkan: ${res.sessionsCount} sesi, ${res.customCount} soal kustom.`,
+            `Data berhasil disinkronkan: ${res.sessionsCount} sesi.`,
           );
         } else {
           toast.info("Semua data lokal telah tersinkronisasi ke cloud.");

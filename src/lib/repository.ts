@@ -3,7 +3,7 @@
 // Repository layer: satu interface untuk penyimpanan lokal (tamu)
 // dan Supabase (user login). Halaman tidak perlu tahu bedanya.
 
-import type { Question, SessionResult } from "./types";
+import type { SessionResult } from "./types";
 import type { ChatSession } from "./storage";
 import { localStore } from "./storage";
 import { createClient } from "@/lib/supabase/client";
@@ -18,8 +18,6 @@ export interface Repository {
   listWrong(): Promise<Record<string, number>>;
   recordWrong(id: string, wasWrong: boolean): Promise<void>;
   clearWrong(ids?: string[]): Promise<void>;
-  listCustomQuestions(): Promise<Question[]>;
-  saveCustomQuestions(qs: Question[]): Promise<void>;
   listChatSessions(): Promise<ChatSession[]>;
   saveChatSession(s: ChatSession): Promise<ChatSession[]>;
   deleteChatSession(id: string): Promise<ChatSession[]>;
@@ -43,12 +41,6 @@ export const localRepo: Repository = {
   },
   async clearWrong(ids) {
     localStore.clearWrong(ids);
-  },
-  async listCustomQuestions() {
-    return localStore.getCustomQuestions();
-  },
-  async saveCustomQuestions(qs) {
-    localStore.saveCustomQuestions(qs);
   },
   async listChatSessions() {
     return localStore.getChatSessions();
@@ -125,34 +117,6 @@ class SupabaseRepo implements Repository {
       }
     } catch {
       // offline — penghapusan lokal dulu, cloud menyusul saat push berikutnya
-    }
-  }
-  async listCustomQuestions(): Promise<Question[]> {
-    try {
-      const sb = createClient();
-      const { data } = await sb.from("custom_questions").select("payload");
-      const cloud = (data ?? []).map((row) => row.payload as Question);
-      const byId = new Map<string, Question>();
-      for (const q of [...localStore.getCustomQuestions(), ...cloud]) {
-        if (q?.id) byId.set(q.id, q);
-      }
-      return [...byId.values()];
-    } catch {
-      return localStore.getCustomQuestions();
-    }
-  }
-  async saveCustomQuestions(qs: Question[]) {
-    localStore.saveCustomQuestions(qs);
-    try {
-      const sb = createClient();
-      // ganti seluruh set soal kustom milik user (sederhana & idempoten)
-      await sb.from("custom_questions").delete().neq("question_id", "");
-      if (qs.length === 0) return;
-      await sb.from("custom_questions").insert(
-        qs.map((q) => ({ question_id: q.id, payload: q })),
-      );
-    } catch {
-      // offline — lokal sudah tersimpan; sinkron penuh menyusul saat login sync
     }
   }
   async listChatSessions(): Promise<ChatSession[]> {

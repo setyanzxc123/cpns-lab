@@ -150,31 +150,15 @@ async function refreshCacheInBackground() {
   }
 }
 
-function dedupeById(qs: Question[]): Question[] {
-  const seen = new Set<string>();
-  const out: Question[] = [];
-  for (const q of qs) {
-    if (!seen.has(q.id)) {
-      seen.add(q.id);
-      out.push(q);
-    }
-  }
-  return out;
-}
-
-/** Muat bank soal (Supabase cache-first) + soal kustom (localStorage). */
+/** Muat bank soal (Supabase cache-first). */
 export async function loadBank(): Promise<Question[]> {
-  const { getRepo } = await import("@/lib/repository");
-  const repo = await getRepo();
-  const custom = await repo.listCustomQuestions().catch(() => []);
-
   const cache = readCache();
   const stale = !cache || Date.now() - Date.parse(cache.fetchedAt) > STALE_MS;
 
   // Cache ada → pakai langsung (offline-safe). Kalau basi, segarkan di latar.
   if (cache) {
     if (stale && isOnline()) void refreshCacheInBackground();
-    return dedupeById([...cache.questions, ...custom]);
+    return cache.questions;
   }
 
   // Tanpa cache → butuh internet (kunjungan pertama).
@@ -182,32 +166,13 @@ export async function loadBank(): Promise<Question[]> {
     const fresh = await fetchFromSupabase();
     if (fresh && fresh.length > 0) {
       writeCache(fresh);
-      return dedupeById([...fresh, ...custom]);
+      return fresh;
     }
     // Server kosong (belum di-seed) atau fetch gagal — jangan cache, biar
     // percobaan berikutnya mencoba lagi.
   }
 
-  // Offline & tanpa cache: hanya soal kustom lokal yang tersedia.
-  return custom;
-}
-
-/** Memaksa hapus cache lokal dan mengambil ulang bank soal terbaru dari Supabase. */
-export async function forceRefreshBank(): Promise<Question[]> {
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(K_BANK_CACHE);
-  }
-  const { getRepo } = await import("@/lib/repository");
-  const repo = await getRepo();
-  const custom = await repo.listCustomQuestions().catch(() => []);
-
-  const fresh = await fetchFromSupabase();
-  if (fresh && fresh.length > 0) {
-    writeCache(fresh);
-    window.dispatchEvent(new CustomEvent("cpns:bank-updated"));
-    return dedupeById([...fresh, ...custom]);
-  }
-  return custom;
+  return [];
 }
 
 /** Muat bank hanya dari cache localStorage (tanpa jaringan) — untuk latar cepat. */

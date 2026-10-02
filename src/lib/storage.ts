@@ -3,11 +3,10 @@
 // Modul storage lokal (localStorage) — layer persistensi default saat
 // user belum login Supabase. Interface sama dengan SupabaseRepo.
 
-import type { Question, SessionResult } from "./types";
+import type { SessionResult } from "./types";
 
 const K_RESULTS = "cpns.results";
 const K_WRONG = "cpns.wrong";
-const K_CUSTOM = "cpns.customQuestions";
 const K_RUNNING = "cpns.runningExam";
 const K_EXPLAIN_CACHE = "cpns.aiExplains";
 const K_CHAT_SESSIONS = "cpns.chatSessions";
@@ -74,12 +73,6 @@ export const localStore = {
     for (const id of ids) delete w[id];
     write(K_WRONG, w);
   },
-  getCustomQuestions(): Question[] {
-    return read<Question[]>(K_CUSTOM, []);
-  },
-  saveCustomQuestions(qs: Question[]) {
-    write(K_CUSTOM, qs);
-  },
   getRunning() {
     return read<unknown>(K_RUNNING, null);
   },
@@ -132,14 +125,12 @@ export const localStore = {
   hasGuestData(): boolean {
     const results = localStore.getResults();
     const wrong = localStore.getWrong();
-    const custom = localStore.getCustomQuestions();
-    return results.length > 0 || Object.keys(wrong).length > 0 || custom.length > 0;
+    return results.length > 0 || Object.keys(wrong).length > 0;
   },
   clearGuestData(): void {
     if (typeof window === "undefined") return;
     window.localStorage.removeItem(K_RESULTS);
     window.localStorage.removeItem(K_WRONG);
-    window.localStorage.removeItem(K_CUSTOM);
     window.localStorage.removeItem(K_CHAT_SESSIONS);
   },
   getLastSync(): string | null {
