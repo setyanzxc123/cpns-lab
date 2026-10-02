@@ -502,11 +502,11 @@ export function VisualPanel({ spec }: { spec: VisualSpec }) {
 export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
   if ("kind" in glyph && glyph.kind === "image") {
     return (
-      <div className="flex h-16 w-full items-center justify-center p-0.5">
+      <div className="flex w-full items-center justify-center py-1">
         <img
           src={glyph.src}
           alt="Pilihan visual"
-          className="max-h-16 w-auto max-w-full rounded border bg-white p-0.5 object-contain"
+          className="h-28 sm:h-36 md:h-40 w-auto max-w-full rounded-md border bg-white p-1.5 object-contain shadow-xs transition-transform group-hover:scale-105"
         />
       </div>
     );
@@ -514,11 +514,11 @@ export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
 
   if ("kind" in glyph && glyph.kind === "dual-v") {
     return (
-      <div className="flex flex-col items-center gap-1">
-        <div className="h-12 w-14 shrink-0 rounded border bg-card p-0.5">
+      <div className="flex flex-col items-center gap-1.5 py-1">
+        <div className="h-16 w-20 shrink-0 rounded border bg-card p-1">
           <GlyphView glyph={glyph.top} />
         </div>
-        <div className="h-12 w-14 shrink-0 rounded border bg-card p-0.5">
+        <div className="h-16 w-20 shrink-0 rounded border bg-card p-1">
           <GlyphView glyph={glyph.bottom} />
         </div>
       </div>
@@ -527,16 +527,16 @@ export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
 
   if ("kind" in glyph && glyph.kind === "dual-h") {
     return (
-      <div className="flex items-center gap-1">
-        <div className="h-14 w-12 shrink-0 rounded border bg-card p-0.5">
+      <div className="flex items-center gap-1.5 py-1">
+        <div className="h-20 w-16 shrink-0 rounded border bg-card p-1">
           <GlyphView glyph={glyph.left} />
         </div>
-        <div className="h-14 w-12 shrink-0 rounded border bg-card p-0.5">
+        <div className="h-20 w-16 shrink-0 rounded border bg-card p-1">
           <GlyphView glyph={glyph.right} />
         </div>
       </div>
     );
   }
 
-  return <GlyphPanel glyph={glyph} className="h-14 w-14" />;
+  return <GlyphPanel glyph={glyph} className="h-20 w-20 sm:h-24 sm:w-24" />;
 }

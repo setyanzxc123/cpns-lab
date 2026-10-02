@@ -348,47 +348,85 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
             </div>
           )}
 
-          <div className={q.options.some((o) => o.visual) ? "grid grid-cols-2 gap-2 sm:grid-cols-4" : "space-y-2"}>
-            {q.options.map((opt, i) => {
-              const selected = chosen === i;
-              let feedbackCls = "";
-              if (showFeedback && q.category !== "TKP") {
-                if (i === q.answer) feedbackCls = "border-green-600 bg-green-50 dark:border-green-500/80 dark:bg-green-950/40 text-green-950 dark:text-green-200";
-                else if (selected) feedbackCls = "border-red-500 bg-red-50 dark:border-red-500/80 dark:bg-red-950/40 text-red-950 dark:text-red-200";
-              } else if (showFeedback && q.category === "TKP" && selected) {
-                feedbackCls = "border-blue-600 bg-blue-50 dark:border-blue-500/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200";
-              }
-              return (
-                <button
-                  key={i}
-                  disabled={showFeedback}
-                  onClick={() => setChoices((c) => ({ ...c, [q.id]: i }))}
-                  className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                    selected ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                  } ${feedbackCls} ${showFeedback ? "cursor-default" : ""}`}
-                >
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-                      selected ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    {LETTERS[i]}
-                  </span>
-                  {opt.visual ? (
-                    <GlyphPanelOption glyph={opt.visual} />
-                  ) : (
-                    <span className="text-sm">{opt.text}</span>
-                  )}
-                  {showFeedback && q.category !== "TKP" && i === q.answer && (
-                    <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />
-                  )}
-                  {showFeedback && q.category !== "TKP" && selected && i !== q.answer && (
-                    <XCircle className="ml-auto h-5 w-5 shrink-0 text-red-500" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {(() => {
+            const hasVisual = q.options.some((o) => o.visual);
+            return (
+              <div className={hasVisual ? "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5" : "space-y-2"}>
+                {q.options.map((opt, i) => {
+                  const selected = chosen === i;
+                  let feedbackCls = "";
+                  if (showFeedback && q.category !== "TKP") {
+                    if (i === q.answer) feedbackCls = "border-green-600 bg-green-50 dark:border-green-500/80 dark:bg-green-950/40 text-green-950 dark:text-green-200 ring-2 ring-green-600/30";
+                    else if (selected) feedbackCls = "border-red-500 bg-red-50 dark:border-red-500/80 dark:bg-red-950/40 text-red-950 dark:text-red-200 ring-2 ring-red-500/30";
+                  } else if (showFeedback && q.category === "TKP" && selected) {
+                    feedbackCls = "border-blue-600 bg-blue-50 dark:border-blue-500/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200 ring-2 ring-blue-600/30";
+                  }
+
+                  if (hasVisual) {
+                    return (
+                      <button
+                        key={i}
+                        disabled={showFeedback}
+                        onClick={() => setChoices((c) => ({ ...c, [q.id]: i }))}
+                        className={`group relative flex flex-col items-center justify-between gap-2 rounded-xl border p-2.5 text-center transition-all hover:border-primary/60 hover:shadow-sm ${
+                          selected ? "border-primary bg-primary/5 ring-2 ring-primary/40 shadow-sm" : "bg-card hover:bg-muted/40"
+                        } ${feedbackCls} ${showFeedback ? "cursor-default" : ""}`}
+                      >
+                        <div className="flex w-full items-center justify-between px-0.5">
+                          <span
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition-colors ${
+                              selected ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground group-hover:border-foreground group-hover:text-foreground"
+                            }`}
+                          >
+                            {LETTERS[i]}
+                          </span>
+                          {showFeedback && q.category !== "TKP" && i === q.answer && (
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+                          )}
+                          {showFeedback && q.category !== "TKP" && selected && i !== q.answer && (
+                            <XCircle className="h-5 w-5 shrink-0 text-red-500" />
+                          )}
+                        </div>
+                        <div className="flex w-full flex-1 items-center justify-center">
+                          {opt.visual ? (
+                            <GlyphPanelOption glyph={opt.visual} />
+                          ) : (
+                            <span className="text-sm font-medium">{opt.text}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={i}
+                      disabled={showFeedback}
+                      onClick={() => setChoices((c) => ({ ...c, [q.id]: i }))}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                        selected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/50"
+                      } ${feedbackCls} ${showFeedback ? "cursor-default" : ""}`}
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                          selected ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground"
+                        }`}
+                      >
+                        {LETTERS[i]}
+                      </span>
+                      <span className="text-sm">{opt.text}</span>
+                      {showFeedback && q.category !== "TKP" && i === q.answer && (
+                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />
+                      )}
+                      {showFeedback && q.category !== "TKP" && selected && i !== q.answer && (
+                        <XCircle className="ml-auto h-5 w-5 shrink-0 text-red-500" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {showFeedback && q.category === "TKP" && q.points && (
             <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
