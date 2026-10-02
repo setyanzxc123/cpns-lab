@@ -1,5 +1,4 @@
-import { generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { getGenAI, GEMINI_MODEL_ID, generationConfig } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -52,7 +51,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
   const body = await req.json();
 
   const ops = (body.options ?? [])
@@ -80,14 +78,15 @@ Buat penjelasan maksimal 150 kata:
 3. Tips praktis agar tidak terkecoh jawaban mirip.`;
 
   try {
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
-      system: SYSTEM_PROMPT,
-      prompt,
-      maxOutputTokens: 600,
+    const interaction = await getGenAI().interactions.create({
+      model: GEMINI_MODEL_ID,
+      input: prompt,
+      system_instruction: SYSTEM_PROMPT,
+      generation_config: generationConfig(600),
+      store: false,
     });
 
-    return Response.json({ explanation: text });
+    return Response.json({ explanation: interaction.output_text ?? "" });
   } catch {
     return Response.json(
       { explanation: "Gagal memproses penjelasan dengan AI saat ini. Gunakan pembahasan resmi yang tertera." },

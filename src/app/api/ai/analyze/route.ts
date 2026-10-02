@@ -1,5 +1,4 @@
-import { generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { getGenAI, GEMINI_MODEL_ID, generationConfig } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -25,7 +24,6 @@ export async function POST(req: Request) {
       { status: 200 },
     );
   }
-  const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
   const data: AnalyzeInput = await req.json();
 
   // Hemat token: hanya ringkasan agregat yang dikirim, bukan mentahannya
@@ -44,11 +42,12 @@ Soal salah tertunda: ${data.wrongCount}
 
 Bahasa Indonesia, maksimal 450 kata, langsung ke isi.`;
 
-  const { text } = await generateText({
-    model: google("gemini-2.5-flash"),
-    prompt,
-    maxOutputTokens: 1200,
+  const interaction = await getGenAI().interactions.create({
+    model: GEMINI_MODEL_ID,
+    input: prompt,
+    generation_config: generationConfig(1200),
+    store: false,
   });
 
-  return Response.json({ report: text });
+  return Response.json({ report: interaction.output_text ?? "" });
 }
