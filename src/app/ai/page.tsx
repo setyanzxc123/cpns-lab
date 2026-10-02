@@ -4,24 +4,69 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
-import { TextStreamChatTransport } from "ai";
+import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
 import type { Question } from "@/lib/types";
 import type { ChatSession } from "@/lib/storage";
 import { getRepo } from "@/lib/repository";
+import { useSmoothText } from "@/hooks/use-smooth-text";
 import { loadBank } from "@/data/bank";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ChatHistoryList } from "@/components/chat-history";
-import { Bot, History, Loader2, Send, Sparkles, User } from "lucide-react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message,
+  MessageActions,
+  MessageAction,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from "@/components/ai-elements/prompt-input";
+import { Bot, Copy, History, Loader2, RefreshCcw, Sparkles } from "lucide-react";
 
 const LETTERS = ["A", "B", "C", "D", "E"];
+
+/** Balasan assistant dengan efek ketik mulus saat sedang streaming. */
+function AssistantMessage({ text, streaming }: { text: string; streaming: boolean }) {
+  const smooth = useSmoothText(text, streaming);
+  return <MessageResponse>{smooth}</MessageResponse>;
+}
 
 interface ChatContext {
   id?: string;
   label: string;
+}
+
+function messageText(m: UIMessage): string {
+  return m.parts
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("");
+}
+
+function messageReasoning(m: UIMessage): string {
+  return m.parts
+    .filter((p): p is { type: "reasoning"; text: string } => p.type === "reasoning")
+    .map((p) => p.text)
+    .join("");
 }
 
 function buildSeed(q: Question, choice: number | null): string {
@@ -110,8 +155,9 @@ function AiChat() {
   }, [qid]);
 
   // Transport dibuat sekali — instansiasi ulang tiap render memutus koneksi stream.
-  const [transport] = useState(() => new TextStreamChatTransport({ api: "/api/ai/chat" }));
-  const { messages, sendMessage, setMessages, status, error } = useChat({ transport });
+  // Protokol UIMessage: mendukung part reasoning dari server.
+  const [transport] = useState(() => new DefaultChatTransport({ api: "/api/ai/chat" }));
+  const { messages, sendMessage, setMessages, status, error, stop, regenerate } = useChat({ transport });
   const [report, setReport] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -196,6 +242,24 @@ function AiChat() {
       setContext(null);
     }
   }
+
+  // Indikator mengetik: tampil hanya saat belum ada teks maupun ringkasan berpikir
+  const lastMessage = messages[messages.length - 1];
+  const lastText = lastMessage ? messageText(lastMessage) : "";
+  const lastReasoning = lastMessage ? messageReasoning(lastMessage) : "";
+  const waitingForFirstToken =
+    (status === "submitted" || status === "streaming") &&
+    messages.length > 0 &&
+    lastMessage?.role === "assistant" &&
+    lastText.length === 0 &&
+    lastReasoning.length === 0;
+
+  // Stream selesai tanpa teks → kemungkinan error upstream tertelan (kuota, dll.)
+  const emptyReply =
+    status === "ready" &&
+    messages.length > 0 &&
+    lastMessage?.role === "assistant" &&
+    lastText.length === 0;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl gap-6">
@@ -369,89 +433,122 @@ function AiChat() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="max-h-[28rem] space-y-3 overflow-y-auto rounded-lg border p-3">
-              {messages.length === 0 && !context && (
-                <div className="space-y-2 py-6 text-center text-sm text-muted-foreground">
-                  <p>Belum ada percakapan. Coba tanya:</p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {[
-                      "Buatkan 5 soal latihan Pancasila beserta pembahasan",
-                      "Trik cepat menjawab deret angka di TIU",
-                      "Jelaskan perbedaan norma hukum dan kesusilaan",
-                    ].map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => sendMessage({ text: s })}
-                        className="rounded-full border px-3 py-1 text-xs hover:bg-muted"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {messages.map((m) => (
-                <div key={m.id} className={`flex gap-2 ${m.role === "user" ? "justify-end" : ""}`}>
-                  {m.role !== "user" && (
-                    <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                      <Bot className="h-4 w-4" aria-hidden />
-                    </span>
-                  )}
-                  <div
-                    className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      m.role === "user" ? "bg-blue-600 text-white" : "bg-muted text-foreground"
-                    }`}
+            <Conversation className="h-[28rem] rounded-lg border">
+              <ConversationContent className="p-3">
+                {messages.length === 0 && !context && (
+                  <ConversationEmptyState
+                    title="Belum ada percakapan"
+                    description="Mulai bertanya, atau coba salah satu contoh berikut:"
+                    icon={<Sparkles className="h-5 w-5" aria-hidden />}
                   >
-                    {m.parts
-                      .filter((p): p is { type: "text"; text: string } => p.type === "text")
-                      .map((p) => p.text)
-                      .join("")}
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {[
+                        "Buatkan 5 soal latihan Pancasila beserta pembahasan",
+                        "Trik cepat menjawab deret angka di TIU",
+                        "Jelaskan perbedaan norma hukum dan kesusilaan",
+                      ].map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => sendMessage({ text: s })}
+                          className="rounded-full border px-3 py-1 text-xs hover:bg-muted"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </ConversationEmptyState>
+                )}
+                {messages.map((m) => {
+                  const text = messageText(m);
+                  const reasoning = messageReasoning(m);
+                  const isLast = m.id === messages[messages.length - 1]?.id;
+                  const streaming = status === "streaming" && isLast;
+                  return (
+                    <Message key={m.id} from={m.role}>
+                      <MessageContent>
+                        {reasoning && (
+                          <Reasoning isStreaming={streaming && text.length === 0}>
+                            <ReasoningTrigger />
+                            <ReasoningContent>{reasoning}</ReasoningContent>
+                          </Reasoning>
+                        )}
+                        {m.role === "assistant" ? (
+                          <AssistantMessage
+                            text={text}
+                            streaming={streaming && text.length > 0}
+                          />
+                        ) : (
+                          <MessageResponse>{text}</MessageResponse>
+                        )}
+                      </MessageContent>
+                      {m.role === "assistant" && text && (
+                        <MessageActions className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                          <MessageAction
+                            tooltip="Salin"
+                            aria-label="Salin balasan"
+                            onClick={() => void navigator.clipboard.writeText(text)}
+                          >
+                            <Copy className="h-3.5 w-3.5" aria-hidden />
+                          </MessageAction>
+                          {isLast && (
+                            <MessageAction
+                              tooltip="Ulangi"
+                              aria-label="Ulangi balasan terakhir"
+                              onClick={() => void regenerate()}
+                            >
+                              <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
+                            </MessageAction>
+                          )}
+                        </MessageActions>
+                      )}
+                    </Message>
+                  );
+                })}
+                {waitingForFirstToken && (
+                  <Message from="assistant">
+                    <MessageContent>
+                      <div className="flex items-center gap-1 py-1">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+                        <span className="sr-only">Tutor sedang menulis…</span>
+                      </div>
+                    </MessageContent>
+                  </Message>
+                )}
+                {emptyReply && (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                    AI tidak mengirim balasan — kemungkinan kuota harian API habis atau terjadi gangguan. Coba lagi nanti.
                   </div>
-                  {m.role === "user" && (
-                    <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-                      <User className="h-4 w-4" aria-hidden />
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
+                )}
+              </ConversationContent>
+              <ConversationScrollButton />
+            </Conversation>
             {error && (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
                 Gagal: {error.message}. Pastikan GEMINI_API_KEY terpasang dan server berjalan.
               </div>
             )}
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const input = form.elements.namedItem("msg") as HTMLTextAreaElement;
-                if (!input.value.trim()) return;
-                sendMessage({ text: input.value });
-                input.value = "";
+            <PromptInput
+              onSubmit={({ text }) => {
+                const t = (text ?? "").trim();
+                if (!t) return;
+                sendMessage({ text: t });
               }}
             >
-              <Textarea
-                name="msg"
-                placeholder="Tulis pertanyaan… (Enter untuk kirim)"
-                aria-label="Pesan untuk tutor AI"
-                rows={2}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-              />
-              <Button
-                type="submit"
-                size="icon"
-                aria-label="Kirim pesan"
-                disabled={status === "submitted" || status === "streaming"}
-              >
-                <Send className="h-4 w-4" aria-hidden />
-              </Button>
-            </form>
+              <PromptInputBody>
+                <PromptInputTextarea
+                  aria-label="Pesan untuk tutor AI"
+                  placeholder="Tulis pertanyaan… (Enter untuk kirim)"
+                />
+              </PromptInputBody>
+              <PromptInputFooter>
+                <span className="text-[11px] text-muted-foreground">
+                  Enter kirim · Shift+Enter baris baru
+                </span>
+                <PromptInputSubmit status={status} onStop={() => stop()} aria-label="Kirim pesan" />
+              </PromptInputFooter>
+            </PromptInput>
           </CardContent>
         </Card>
       </div>
