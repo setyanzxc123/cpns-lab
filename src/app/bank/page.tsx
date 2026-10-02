@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadBank, forceRefreshBank, BANK_CACHE_VERSION } from "@/data/bank";
+import { loadBank, forceRefreshBank } from "@/data/bank";
 import { getRepo } from "@/lib/repository";
 import type { Question } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,7 +109,7 @@ export default function BankPage() {
           <h1 className="text-2xl font-bold">Bank Soal</h1>
           {bank.length > 0 ? (
             <p className="text-sm text-muted-foreground">
-              {bank.length} soal tersedia ({custom.length} kustom) • Versi Cache: {BANK_CACHE_VERSION}
+              {bank.length} soal tersedia ({custom.length} kustom)
             </p>
           ) : (
             <p className="text-sm text-amber-600 dark:text-amber-400">
@@ -119,16 +119,6 @@ export default function BankPage() {
             </p>
           )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="self-start sm:self-auto gap-2"
-        >
-          <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "Menyegarkan..." : "Segarkan Bank Soal"}
-        </Button>
       </div>
 
       <Card>
@@ -137,10 +127,9 @@ export default function BankPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Tempelkan JSON soal di bawah lalu klik Impor. Untuk TWK/TIU isi{" "}
-            <code className="rounded bg-muted px-1">answer</code> (index jawaban mulai 0); untuk TKP isi{" "}
-            <code className="rounded bg-muted px-1">points</code> (nilai 1–5 per opsi). Bisa juga unggah file{" "}
-            <code className="rounded bg-muted px-1">.json</code> dari konversi Word/Excel.
+            Tempel JSON soal lalu klik Impor — TWK/TIU butuh{" "}
+            <code className="rounded bg-muted px-1">answer</code> (mulai 0), TKP butuh{" "}
+            <code className="rounded bg-muted px-1">points</code> (1–5). Klik “Isi contoh format” untuk strukturnya.
           </p>
           <Textarea
             rows={8}
@@ -185,8 +174,13 @@ export default function BankPage() {
                 </div>
                 <p>{q.text}</p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => deleteCustom(q.id)}>
-                <Trash2 className="h-4 w-4 text-red-500" />
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Hapus soal kustom ${q.id}`}
+                onClick={() => deleteCustom(q.id)}
+              >
+                <Trash2 className="h-4 w-4 text-red-500" aria-hidden />
               </Button>
             </div>
           ))}
@@ -195,20 +189,25 @@ export default function BankPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Semua Soal (pratinjau)</CardTitle>
+          <CardTitle className="text-base">Pratinjau Bank</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="max-h-96 space-y-1.5 overflow-y-auto">
-            {bank.map((q) => (
-              <div key={q.id} className="flex items-center gap-2 rounded border px-2.5 py-1.5 text-xs">
-                <Badge variant="outline" className="shrink-0">
-                  {q.category}
-                </Badge>
-                <span className="shrink-0 text-muted-foreground">{q.sub}</span>
-                <span className="truncate text-muted-foreground">{q.text}</span>
-              </div>
-            ))}
-          </div>
+          <details>
+            <summary className="cursor-pointer select-none text-sm font-medium text-muted-foreground">
+              Lihat semua soal ({bank.length})
+            </summary>
+            <div className="mt-3 max-h-96 space-y-1.5 overflow-y-auto">
+              {bank.map((q) => (
+                <div key={q.id} className="flex items-center gap-2 rounded border px-2.5 py-1.5 text-xs">
+                  <Badge variant="outline" className="shrink-0">
+                    {q.category}
+                  </Badge>
+                  <span className="shrink-0 text-muted-foreground">{q.sub}</span>
+                  <span className="truncate text-muted-foreground">{q.text}</span>
+                </div>
+              ))}
+            </div>
+          </details>
         </CardContent>
       </Card>
     </div>

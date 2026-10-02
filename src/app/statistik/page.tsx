@@ -117,7 +117,7 @@ export default function StatistikPage() {
           <p className="text-sm text-muted-foreground">
             {wrongCount > 0
               ? `${wrongCount} soal pernah Anda jawab salah dan belum diulang dengan benar.`
-              : "Tidak ada soal salah yang tertunda. 🎉"}
+              : (<><span aria-hidden>🎉</span> Tidak ada soal salah yang tertunda.</>)}
           </p>
           <div className="flex gap-2">
             {wrongCount > 0 ? (
@@ -159,7 +159,7 @@ export default function StatistikPage() {
                     · {Math.floor(r.durationSec / 60)} menit
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {r.passingGradeSummary && (
                     <Badge
                       className={
@@ -171,17 +171,12 @@ export default function StatistikPage() {
                       {r.passed ? "Lulus PG" : "TMS"}
                     </Badge>
                   )}
-                  {r.avgTimePerQuestionSec != null && (
-                    <span className="text-xs font-mono text-muted-foreground hidden sm:inline">
-                      ⏱️ {r.avgTimePerQuestionSec}s/soal
-                    </span>
-                  )}
-                  {r.subScores.map((s) => (
-                    <Badge key={s.category} variant="outline">
-                      {s.category} {s.score}/{s.maxScore}
-                    </Badge>
-                  ))}
-                  <Badge className={pct >= 60 ? "bg-emerald-600" : "bg-amber-600"}>{pct}%</Badge>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {pct}%
+                    {r.avgTimePerQuestionSec != null && ` · ${r.avgTimePerQuestionSec} dtk/soal`}
+                    {" · " +
+                      r.subScores.map((sc) => `${sc.category} ${sc.score}/${sc.maxScore}`).join(" · ")}
+                  </span>
                 </div>
               </div>
             );

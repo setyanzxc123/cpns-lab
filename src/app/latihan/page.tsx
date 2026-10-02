@@ -105,10 +105,19 @@ export default function LatihanPage() {
                   setCat(c);
                   setSubs([]);
                 }}
-                className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
-                  cat === c ? "text-white" : "bg-card"
+                aria-pressed={cat === c}
+                className={`min-h-10 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+                  cat === c ? "" : "bg-card"
                 }`}
-                style={cat === c ? { backgroundColor: CATEGORY_INFO[c].color, borderColor: CATEGORY_INFO[c].color } : {}}
+                style={
+                  cat === c
+                    ? {
+                        color: CATEGORY_INFO[c].color,
+                        borderColor: CATEGORY_INFO[c].color,
+                        backgroundColor: `color-mix(in oklab, ${CATEGORY_INFO[c].color} 12%, transparent)`,
+                      }
+                    : {}
+                }
               >
                 {c}
               </button>
@@ -135,8 +144,14 @@ export default function LatihanPage() {
           </div>
 
           <div className="max-w-40">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Jumlah soal</label>
+            <label
+              htmlFor="jumlah-soal"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Jumlah soal
+            </label>
             <Input
+              id="jumlah-soal"
               type="number"
               min={1}
               value={count}

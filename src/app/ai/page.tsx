@@ -6,14 +6,13 @@ import { TextStreamChatTransport } from "ai";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Bot, Loader2, Send, Sparkles, User } from "lucide-react";
 
 export default function AiPage() {
   const aiOn = Boolean(process.env.NEXT_PUBLIC_HAS_GEMINI);
-  const { messages, sendMessage, status, error } = useChat({
-    transport: new TextStreamChatTransport({ api: "/api/ai/chat" }),
-  });
+  // Transport dibuat sekali — instansiasi ulang tiap render memutus koneksi stream.
+  const [transport] = useState(() => new TextStreamChatTransport({ api: "/api/ai/chat" }));
+  const { messages, sendMessage, status, error } = useChat({ transport });
   const [report, setReport] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -28,9 +27,7 @@ export default function AiPage() {
 
       {!aiOn && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-          Chat AI butuh <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50 dark:text-amber-200">GEMINI_API_KEY</code> di file{" "}
-          <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50 dark:text-amber-200">.env.local</code>. Lihat README untuk langkah pemasangan.
-          Analisis skor di bawah juga memakai kunci yang sama.
+          Chat &amp; analisis skor butuh <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50 dark:text-amber-200">GEMINI_API_KEY</code> — lihat README untuk pemasangan.
         </div>
       )}
 
@@ -111,8 +108,7 @@ export default function AiPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Bot className="h-4 w-4 text-blue-700 dark:text-blue-400" /> Chat dengan Tutor{" "}
-            <Badge variant="outline">gemini-2.5-flash</Badge>
+            <Bot className="h-4 w-4 text-blue-700 dark:text-blue-400" aria-hidden /> Chat dengan Tutor
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -181,6 +177,7 @@ export default function AiPage() {
             <Textarea
               name="msg"
               placeholder="Tulis pertanyaan… (Enter untuk kirim)"
+              aria-label="Pesan untuk tutor AI"
               rows={2}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -189,8 +186,13 @@ export default function AiPage() {
                 }
               }}
             />
-            <Button type="submit" size="icon" disabled={status === "submitted" || status === "streaming"}>
-              <Send className="h-4 w-4" />
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Kirim pesan"
+              disabled={status === "submitted" || status === "streaming"}
+            >
+              <Send className="h-4 w-4" aria-hidden />
             </Button>
           </form>
         </CardContent>

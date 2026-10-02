@@ -1,5 +1,7 @@
 import type { Category, Question, SubCategory } from "@/lib/types";
 
+// Warna kategori memakai token semantik --category-* (lihat globals.css) sehingga
+// otomatis menyesuaikan mode terang/gelap dengan kontras yang lulus WCAG AA.
 export const CATEGORY_INFO: Record<
   Category,
   { name: string; desc: string; color: string }
@@ -7,17 +9,17 @@ export const CATEGORY_INFO: Record<
   TWK: {
     name: "Tes Wawasan Kebangsaan",
     desc: "Pancasila, UUD 1945, NKRI, Bhinneka Tunggal Ika, integritas, dan bela negara.",
-    color: "#2563eb",
+    color: "var(--category-twk)",
   },
   TIU: {
     name: "Tes Intelegensi Umum",
     desc: "Kemampuan verbal, numerik, figural, dan penalaran logika.",
-    color: "#7c3aed",
+    color: "var(--category-tiu)",
   },
   TKP: {
     name: "Tes Karakter Pribadi",
     desc: "Pelayanan publik, jejaring kerja, sosial budaya, TIK, profesionalisme, anti radikalisme.",
-    color: "#059669",
+    color: "var(--category-tkp)",
   },
 };
 

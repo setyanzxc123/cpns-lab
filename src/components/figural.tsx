@@ -322,10 +322,16 @@ function ShapeView({ shape }: { shape: Shape }) {
 }
 
 /** Satu sel: primitif + bingkai konfigurabel. */
-export function GlyphView({ glyph }: { glyph: Glyph }) {
+export function GlyphView({
+  glyph,
+  label = "Diagram pola visual",
+}: {
+  glyph: Glyph;
+  label?: string;
+}) {
   const frame = glyph.frame;
   return (
-    <svg viewBox="0 0 100 100" className="h-full w-full" role="img">
+    <svg viewBox="0 0 100 100" className="h-full w-full" role="img" aria-label={label}>
       <HatchDefs />
       {!frame?.none && !frame?.circle && (
         <rect
@@ -383,6 +389,8 @@ export function GlyphView({ glyph }: { glyph: Glyph }) {
 function QuestionMarkPanel({ className }: { className: string }) {
   return (
     <div
+      role="img"
+      aria-label="Tanda tanya — bagian pola yang harus dilengkapi"
       className={`${className} flex items-center justify-center rounded-lg border-2 border-dashed bg-muted text-2xl font-bold text-muted-foreground`}
     >
       ?
@@ -390,10 +398,18 @@ function QuestionMarkPanel({ className }: { className: string }) {
   );
 }
 
-function GlyphPanel({ glyph, className }: { glyph: Glyph; className: string }) {
+function GlyphPanel({
+  glyph,
+  className,
+  label,
+}: {
+  glyph: Glyph;
+  className: string;
+  label?: string;
+}) {
   return (
     <div className={`${className} shrink-0 rounded-lg border bg-card p-1`}>
-      <GlyphView glyph={glyph} />
+      <GlyphView glyph={glyph} label={label} />
     </div>
   );
 }
@@ -422,6 +438,8 @@ export function VisualPanel({ spec }: { spec: VisualSpec }) {
         <img
           src={spec.src}
           alt={spec.alt ?? "Stimulus Soal Figural"}
+          loading="lazy"
+          decoding="async"
           className="max-h-72 w-auto max-w-full rounded-lg border bg-white p-2 shadow-sm object-contain"
         />
       </div>
@@ -506,6 +524,8 @@ export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
         <img
           src={glyph.src}
           alt="Pilihan visual"
+          loading="lazy"
+          decoding="async"
           className="h-28 sm:h-36 md:h-40 w-auto max-w-full rounded-md border bg-white p-1.5 object-contain shadow-xs transition-transform group-hover:scale-105"
         />
       </div>
@@ -516,10 +536,10 @@ export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
     return (
       <div className="flex flex-col items-center gap-1.5 py-1">
         <div className="h-16 w-20 shrink-0 rounded border bg-card p-1">
-          <GlyphView glyph={glyph.top} />
+          <GlyphView glyph={glyph.top} label="Pilihan jawaban — bagian atas" />
         </div>
         <div className="h-16 w-20 shrink-0 rounded border bg-card p-1">
-          <GlyphView glyph={glyph.bottom} />
+          <GlyphView glyph={glyph.bottom} label="Pilihan jawaban — bagian bawah" />
         </div>
       </div>
     );
@@ -529,14 +549,20 @@ export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
     return (
       <div className="flex items-center gap-1.5 py-1">
         <div className="h-20 w-16 shrink-0 rounded border bg-card p-1">
-          <GlyphView glyph={glyph.left} />
+          <GlyphView glyph={glyph.left} label="Pilihan jawaban — bagian kiri" />
         </div>
         <div className="h-20 w-16 shrink-0 rounded border bg-card p-1">
-          <GlyphView glyph={glyph.right} />
+          <GlyphView glyph={glyph.right} label="Pilihan jawaban — bagian kanan" />
         </div>
       </div>
     );
   }
 
-  return <GlyphPanel glyph={glyph} className="h-20 w-20 sm:h-24 sm:w-24" />;
+  return (
+    <GlyphPanel
+      glyph={glyph}
+      className="h-20 w-20 sm:h-24 sm:w-24"
+      label="Pilihan jawaban visual"
+    />
+  );
 }

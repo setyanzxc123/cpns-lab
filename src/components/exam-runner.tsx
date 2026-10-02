@@ -276,11 +276,13 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                 <button
                   key={qq.id}
                   onClick={() => changeCurrentIndex(i)}
-                  className={`h-8 w-8 rounded text-xs font-semibold transition-colors ${
+                  aria-pressed={i === current}
+                  aria-label={`Soal ${i + 1}${flagged ? " — ditandai ragu-ragu" : answered ? " — terjawab" : " — belum dijawab"}`}
+                  className={`relative h-8 w-8 rounded text-xs font-semibold transition-colors after:absolute after:-inset-1.5 after:content-[''] ${
                     i === current
                       ? "bg-primary text-primary-foreground ring-2 ring-offset-1 ring-primary"
                       : answered
-                        ? "bg-blue-600 text-white"
+                        ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:bg-muted/70"
                   } ${flagged ? "outline outline-2 outline-amber-500" : ""}`}
                   title={flagged ? "Ditandai ragu-ragu" : answered ? "Terjawab" : "Belum dijawab"}
@@ -302,25 +304,31 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
               <span className="ml-2 text-xs text-muted-foreground">{q.sub}</span>
             </div>
             <div className="flex items-center gap-2">
-              {/* Indikator pacing waktu soal ini */}
-              <div
-                className={`flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-xs transition-colors ${
-                  currentQuestionSec > 90
-                    ? "bg-red-100 font-semibold text-red-700 dark:bg-red-950/70 dark:text-red-400"
-                    : currentQuestionSec > 54
-                      ? "bg-amber-100 font-medium text-amber-700 dark:bg-amber-950/70 dark:text-amber-400"
-                      : "bg-muted text-muted-foreground"
-                }`}
-                title={
-                  currentQuestionSec > 90
-                    ? "Waspada: Pengerjaan soal ini sudah >90 detik! Target BKN rata-rata 54 detik."
-                    : "Durasi pada nomor soal ini"
-                }
-              >
-                <Clock className="h-3 w-3" />
-                <span>{formatTime(currentQuestionSec)}</span>
-                {currentQuestionSec > 90 && <span className="font-sans text-[10px] font-bold">⚠️</span>}
-              </div>
+              {/* Indikator pacing waktu soal ini — relevan saat berbentuk waktu */}
+              {config.mode === "simulasi" && (
+                <div
+                  className={`flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-xs transition-colors ${
+                    currentQuestionSec > 90
+                      ? "bg-red-100 font-semibold text-red-700 dark:bg-red-950/70 dark:text-red-400"
+                      : currentQuestionSec > 54
+                        ? "bg-amber-100 font-medium text-amber-700 dark:bg-amber-950/70 dark:text-amber-400"
+                        : "bg-muted text-muted-foreground"
+                  }`}
+                  title={
+                    currentQuestionSec > 90
+                      ? "Waspada: Pengerjaan soal ini sudah >90 detik! Target BKN rata-rata 54 detik."
+                      : "Durasi pada nomor soal ini"
+                  }
+                  aria-label={
+                    currentQuestionSec > 90
+                      ? `Waspada: pengerjaan soal ini ${formatTime(currentQuestionSec)}, melebihi 90 detik. Target BKN rata-rata 54 detik.`
+                      : `Durasi pada soal ini ${formatTime(currentQuestionSec)}`
+                  }
+                >
+                  <Clock className="h-3 w-3" aria-hidden />
+                  <span>{formatTime(currentQuestionSec)}</span>
+                </div>
+              )}
               <span className="text-sm font-semibold text-muted-foreground">
                 No. {current + 1}
               </span>
@@ -328,9 +336,10 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                 <Button
                   variant={flags[q.id] ? "default" : "outline"}
                   size="sm"
+                  aria-pressed={Boolean(flags[q.id])}
                   onClick={() => setFlags((f) => ({ ...f, [q.id]: !f[q.id] }))}
                 >
-                  <Flag className="h-3.5 w-3.5" />
+                  <Flag className="h-3.5 w-3.5" aria-hidden />
                   Ragu-ragu
                 </Button>
               )}
@@ -368,6 +377,8 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                         key={i}
                         disabled={showFeedback}
                         onClick={() => setChoices((c) => ({ ...c, [q.id]: i }))}
+                        aria-pressed={selected}
+                        aria-label={`Pilihan ${LETTERS[i]}${selected ? " — dipilih" : ""}`}
                         className={`group relative flex flex-col items-center justify-between gap-2 rounded-xl border p-2.5 text-center transition-all hover:border-primary/60 hover:shadow-sm ${
                           selected ? "border-primary bg-primary/5 ring-2 ring-primary/40 shadow-sm" : "bg-card hover:bg-muted/40"
                         } ${feedbackCls} ${showFeedback ? "cursor-default" : ""}`}
@@ -381,10 +392,10 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                             {LETTERS[i]}
                           </span>
                           {showFeedback && q.category !== "TKP" && i === q.answer && (
-                            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" aria-hidden />
                           )}
                           {showFeedback && q.category !== "TKP" && selected && i !== q.answer && (
-                            <XCircle className="h-5 w-5 shrink-0 text-red-500" />
+                            <XCircle className="h-5 w-5 shrink-0 text-red-500" aria-hidden />
                           )}
                         </div>
                         <div className="flex w-full flex-1 items-center justify-center">
@@ -403,6 +414,8 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                       key={i}
                       disabled={showFeedback}
                       onClick={() => setChoices((c) => ({ ...c, [q.id]: i }))}
+                      aria-pressed={selected}
+                      aria-label={`Pilihan ${LETTERS[i]}: ${opt.text}${selected ? " — dipilih" : ""}`}
                       className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                         selected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/50"
                       } ${feedbackCls} ${showFeedback ? "cursor-default" : ""}`}

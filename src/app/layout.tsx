@@ -35,6 +35,7 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -59,7 +60,10 @@ export default function RootLayout({
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
             <AuthGate>{children}</AuthGate>
           </main>
-          <footer className="border-t py-4 text-center text-xs text-muted-foreground">
+          <footer
+            className="border-t py-4 text-center text-xs text-muted-foreground"
+            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+          >
             CPNS Lab — alat belajar mandiri. Soal contoh, bukan soal resmi BKN.
           </footer>
           <Toaster />

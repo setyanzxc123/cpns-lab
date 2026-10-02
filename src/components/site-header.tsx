@@ -165,6 +165,13 @@ export function SiteHeader() {
                     ? `${pendingCount} sesi menunggu sinkronisasi. Klik untuk sinkron manual.`
                     : "Tersinkronisasi ke cloud. Klik untuk sinkronisasi manual."
                 }
+                aria-label={`Sinkronisasi cloud: ${
+                  syncing
+                    ? "sedang menyinkronkan"
+                    : pendingCount > 0
+                      ? `${pendingCount} sesi menunggu, klik untuk sinkron manual`
+                      : "tersinkronisasi, klik untuk sinkron manual"
+                }`}
               >
                 {syncing ? (
                   <RefreshCw className="h-3 w-3 animate-spin" />
@@ -175,16 +182,16 @@ export function SiteHeader() {
                   {syncing
                     ? "Sinkronisasi..."
                     : pendingCount > 0
-                      ? `Cloud · ${pendingCount} tertunda`
-                      : "Cloud"}
+                      ? `${pendingCount} tertunda`
+                      : "Tersinkron"}
                 </span>
               </button>
-            ) : !supabaseConfigured() ? (
+            ) : !supabaseConfigured() && process.env.NODE_ENV === "development" ? (
               <div
                 className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-muted bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
-                title="Env Supabase tidak terpasang — data hanya di browser ini (dev lokal)"
+                title="Env Supabase tidak terpasang — data hanya di browser ini"
               >
-                <HardDrive className="h-3 w-3" />
+                <HardDrive className="h-3 w-3" aria-hidden />
                 <span>Mode Dev</span>
               </div>
             ) : null
@@ -210,13 +217,15 @@ export function SiteHeader() {
         </div>
       </div>
       {/* nav mobile */}
-      <nav className="flex gap-1 overflow-x-auto border-t px-2 py-1.5 md:hidden">
+      <nav className="flex gap-1 overflow-x-auto border-t px-2 py-1 md:hidden">
         {NAV.map((n) => (
           <Link
             key={n.href}
             href={n.href}
-            className={`flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium ${
-              pathname === n.href ? "bg-blue-100 text-blue-800" : "text-muted-foreground"
+            className={`flex min-h-11 shrink-0 items-center gap-1 rounded-md px-3 py-2 text-xs font-medium ${
+              pathname === n.href
+                ? "bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300"
+                : "text-muted-foreground"
             }`}
           >
             <n.icon className="h-3.5 w-3.5" />

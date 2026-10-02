@@ -4,7 +4,7 @@
 // analisis manajemen waktu (pacing time) vs benchmark resmi (~54s/soal),
 // skor per subtes, review jawaban berfilter, dan tombol minta penjelasan AI.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Question, SessionResult } from "@/lib/types";
 import { CATEGORY_INFO } from "@/data/bank";
 import { formatTime } from "@/hooks/use-exam";
@@ -36,7 +36,7 @@ export function ResultView({
   result: SessionResult;
   bank: Question[];
 }) {
-  const byId = new Map(bank.map((q) => [q.id, q]));
+  const byId = useMemo(() => new Map(bank.map((q) => [q.id, q])), [bank]);
   const pct = Math.round((result.totalScore / Math.max(1, result.maxScore)) * 100);
   const [filterMode, setFilterMode] = useState<"all" | "wrong" | "traps">("all");
 
@@ -83,28 +83,15 @@ export function ResultView({
                   )}
                 </div>
                 <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2
-                      className={`text-lg sm:text-xl font-bold ${
-                        pgSummary.allPassed
-                          ? "text-emerald-900 dark:text-emerald-100"
-                          : "text-rose-900 dark:text-rose-100"
-                      }`}
-                    >
-                      {pgSummary.allPassed
-                        ? "MEMENUHI NILAI AMBANG BATAS (LULUS PG)"
-                        : "TIDAK MEMENUHI NILAI AMBANG BATAS (TMS)"}
-                    </h2>
-                    <Badge
-                      className={
-                        pgSummary.allPassed
-                          ? "bg-emerald-600 text-white"
-                          : "bg-rose-600 text-white"
-                      }
-                    >
-                      {pgSummary.allPassed ? "Lolos Seleksi PG" : "Gugur Passing Grade"}
-                    </Badge>
-                  </div>
+                  <h2
+                    className={`text-lg sm:text-xl font-bold ${
+                      pgSummary.allPassed
+                        ? "text-emerald-900 dark:text-emerald-100"
+                        : "text-rose-900 dark:text-rose-100"
+                    }`}
+                  >
+                    {pgSummary.allPassed ? "Lulus Passing Grade" : "Tidak Lulus Passing Grade"}
+                  </h2>
                   <p
                     className={`mt-1 text-sm ${
                       pgSummary.allPassed
@@ -148,9 +135,8 @@ export function ResultView({
           <CardTitle>Ringkasan Hasil — {result.title}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat label="Skor Total" value={`${result.totalScore}`} sub={`dari maksimum ${result.maxScore}`} />
-            <Stat label="Persentase" value={`${pct}%`} />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Stat label="Skor Total" value={`${result.totalScore}`} sub={`dari maksimum ${result.maxScore} · ${pct}%`} />
             <Stat
               label="Durasi Total"
               value={`${Math.floor(result.durationSec / 60)} mnt`}
@@ -181,7 +167,6 @@ export function ResultView({
                 const pg = s.passingGrade ?? 0;
                 const pgPct = Math.round((pg / Math.max(1, s.maxScore)) * 100);
                 const isPassed = s.passed ?? s.score >= pg;
-                const diff = s.score - pg;
 
                 return (
                   <div
@@ -195,17 +180,17 @@ export function ResultView({
                         </span>
                         {isPassed ? (
                           <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">
-                            ✓ Lolos PG ({pg})
+                            <span aria-hidden>✓</span> Lolos PG
                           </Badge>
                         ) : (
                           <Badge variant="destructive">
-                            ✗ Di bawah PG ({diff} dari {pg})
+                            <span aria-hidden>✗</span> Di bawah PG
                           </Badge>
                         )}
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground font-mono">
                         {s.correct}/{s.total} benar · skor <b className="text-foreground">{s.score}</b>/
-                        {s.maxScore} (Target PG: {pg})
+                        {s.maxScore}
                       </span>
                     </div>
 
@@ -239,15 +224,10 @@ export function ResultView({
       {pacing && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Timer className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                Analisis Manajemen Waktu (Pacing)
-              </CardTitle>
-              <Badge variant="outline" className="font-mono text-xs">
-                Benchmark Resmi BKN: ~54 dtk / soal
-              </Badge>
-            </div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Timer className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden />
+              Analisis Manajemen Waktu (Pacing)
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Box evaluasi kecepatan */}
@@ -273,10 +253,10 @@ export function ResultView({
                 <div className="space-y-1 text-sm">
                   <p className="font-bold">
                     {pacing.avgTimeSec <= 54
-                      ? `⚡ Kecepatan Pacing Sangat Efisien (${pacing.avgTimeSec} dtk/soal)`
+                      ? "Kecepatan Pacing Efisien"
                       : pacing.avgTimeSec <= 75
-                        ? `⏱️ Kecepatan Cukup Baik (${pacing.avgTimeSec} dtk/soal)`
-                        : `⚠️ Terlalu Lambat — Berisiko Kehabisan Waktu (${pacing.avgTimeSec} dtk/soal)`}
+                        ? "Kecepatan Cukup Baik"
+                        : "Terlalu Lambat — Berisiko Kehabisan Waktu"}
                   </p>
                   <p className="text-xs leading-relaxed opacity-90">
                     {pacing.avgTimeSec <= 54
@@ -289,24 +269,12 @@ export function ResultView({
               </div>
             </div>
 
-            {/* Grid 4 Stat Pacing */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Stat pacing: dua angka yang menuntut tindakan */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">Rata-rata Pengerjaan</p>
                 <p className="font-mono text-xl font-bold">{pacing.avgTimeSec} dtk</p>
-                <p className="text-[11px] text-muted-foreground">Target: 54 dtk</p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <p className="text-xs text-muted-foreground">Soal Cepat (&lt;45s)</p>
-                <p className="font-mono text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                  {pacing.fastQuestionsCount}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Hemat waktu</p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <p className="text-xs text-muted-foreground">Soal Standar (45–90s)</p>
-                <p className="font-mono text-xl font-bold">{pacing.normalQuestionsCount}</p>
-                <p className="text-[11px] text-muted-foreground">Pace normal</p>
+                <p className="text-[11px] text-muted-foreground">Target CAT BKN: 54 dtk</p>
               </div>
               <div className="rounded-lg border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">Jebakan Waktu (&gt;90s)</p>
@@ -315,8 +283,8 @@ export function ResultView({
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {pacing.timeTrapsCount > 0
-                    ? `${pacing.timeTrapsCount} soal > 2 menit!`
-                    : "Perlu diwaspadai"}
+                    ? `${pacing.timeTrapsCount} soal > 2 menit`
+                    : "Gunakan filter di bawah"}
                 </p>
               </div>
             </div>
@@ -335,6 +303,7 @@ export function ResultView({
               variant={filterMode === "all" ? "default" : "ghost"}
               size="sm"
               className="h-7 text-xs"
+              aria-pressed={filterMode === "all"}
               onClick={() => setFilterMode("all")}
             >
               Semua ({result.answers.length})
@@ -343,6 +312,7 @@ export function ResultView({
               variant={filterMode === "wrong" ? "default" : "ghost"}
               size="sm"
               className="h-7 text-xs"
+              aria-pressed={filterMode === "wrong"}
               onClick={() => setFilterMode("wrong")}
             >
               Salah ({wrongCount})
@@ -351,6 +321,7 @@ export function ResultView({
               variant={filterMode === "traps" ? "default" : "ghost"}
               size="sm"
               className="h-7 text-xs"
+              aria-pressed={filterMode === "traps"}
               onClick={() => setFilterMode("traps")}
             >
               Jebakan Waktu &gt;90s ({trapCount})
@@ -362,9 +333,9 @@ export function ResultView({
           <Card>
             <CardContent className="p-8 text-center text-sm text-muted-foreground">
               {filterMode === "wrong"
-                ? "Hebat! Tidak ada jawaban yang salah pada sesi ini. 🎉"
+                ? (<><span aria-hidden>🎉</span> Hebat! Tidak ada jawaban yang salah pada sesi ini.</>)
                 : filterMode === "traps"
-                  ? "Bagus sekali! Tidak ada soal yang memakan waktu melebihi 90 detik. ⚡"
+                  ? (<><span aria-hidden>⚡</span> Bagus sekali! Tidak ada soal yang memakan waktu melebihi 90 detik.</>)
                   : "Tidak ada soal untuk ditampilkan."}
             </CardContent>
           </Card>
@@ -422,9 +393,6 @@ function ReviewCard({
   const [loading, setLoading] = useState(false);
   const [fromCache, setFromCache] = useState(false);
 
-  const isTimeTrap = timeSpentSec != null && timeSpentSec > 90;
-  const isFast = timeSpentSec != null && timeSpentSec <= 45;
-
   useEffect(() => {
     const cached = localStore.getAiExplanation(q.id, choice);
     if (cached) {
@@ -478,44 +446,34 @@ function ReviewCard({
   return (
     <Card className={wrong ? "border-red-200 dark:border-red-900/60" : ""}>
       <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-muted-foreground">No. {index + 1}</span>
-            <Badge variant="outline">{q.category}</Badge>
-            <span className="text-xs text-muted-foreground">{q.sub}</span>
-            {q.category !== "TKP" &&
-              (wrong ? (
-                <Badge variant="destructive">Salah</Badge>
-              ) : (
-                <Badge className="bg-emerald-600 text-white">Benar</Badge>
-              ))}
-            {q.category === "TKP" && <Badge variant="secondary">Nilai {value}/5</Badge>}
-          </div>
-
-          {/* Time Pacing Badge */}
-          {timeSpentSec != null && (
-            <Badge
-              variant="outline"
-              className={`flex items-center gap-1 font-mono text-xs ${
-                timeSpentSec > 120
-                  ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                  : timeSpentSec > 90
-                    ? "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                    : isFast
-                      ? "border-emerald-500/60 text-emerald-700 dark:text-emerald-400"
-                      : "text-muted-foreground"
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <span className="font-mono text-xs text-muted-foreground">No. {index + 1}</span>
+          <span className="font-medium">{q.category}</span>
+          <span className="text-xs text-muted-foreground">{q.sub}</span>
+          {q.category !== "TKP" && (
+            <span
+              className={`text-xs font-semibold ${
+                wrong
+                  ? "text-rose-600 dark:text-rose-400"
+                  : "text-emerald-700 dark:text-emerald-400"
               }`}
             >
-              <Clock className="h-3 w-3" />
-              <span>{formatTime(timeSpentSec)}</span>
-              {timeSpentSec > 120 ? (
-                <span className="font-sans font-semibold text-[10px]">⚠️ Jebakan Waktu</span>
-              ) : timeSpentSec > 90 ? (
-                <span className="font-sans text-[10px]">⚠️ &gt;90s</span>
-              ) : isFast ? (
-                <span className="font-sans text-[10px]">⚡ Cepat</span>
-              ) : null}
-            </Badge>
+              {wrong ? "Salah" : "Benar"}
+            </span>
+          )}
+          {q.category === "TKP" && (
+            <span className="text-xs text-muted-foreground">Nilai {value}/5</span>
+          )}
+          {timeSpentSec != null && (
+            <span
+              className={`font-mono text-xs ${
+                timeSpentSec > 90
+                  ? "font-semibold text-amber-700 dark:text-amber-400"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {formatTime(timeSpentSec)}
+            </span>
           )}
         </div>
 
@@ -548,23 +506,10 @@ function ReviewCard({
           )}
         </div>
 
-        {/* Pacing Advice Box for Time-Trap Questions */}
-        {isTimeTrap && (
-          <div className="rounded-lg border border-amber-300/80 bg-amber-50/80 p-2.5 text-xs text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200 leading-relaxed">
-            <p className="font-semibold flex items-center gap-1.5 mb-0.5">
-              <Clock className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
-              Catatan Pacing: Soal ini menghabiskan waktu {timeSpentSec} detik (&gt;90 detik).
-            </p>
-            <p className="opacity-90">
-              Pada tes CAT BKN sesungguhnya, usahakan tidak terpancing menghitung atau menalar lebih dari 1 menit pada satu soal. Tandai ragu-ragu dan amankan soal-soal lain yang lebih cepat dikerjakan.
-            </p>
-          </div>
-        )}
-
-        <div className="rounded-lg bg-muted/40 p-3 text-sm leading-relaxed">
-          <p className="mb-1 font-semibold">Pembahasan</p>
-          <p className="text-muted-foreground">{q.explanation}</p>
-        </div>
+        <details className="rounded-lg bg-muted/40 p-3 text-sm leading-relaxed">
+          <summary className="cursor-pointer select-none font-semibold">Pembahasan</summary>
+          <p className="mt-1 text-muted-foreground">{q.explanation}</p>
+        </details>
 
         <div>
           {aiExplain ? (

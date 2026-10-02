@@ -56,6 +56,7 @@ export function QuestionText({
                       ri === 0 ? (
                         <th
                           key={ci}
+                          scope="col"
                           className="border border-border bg-muted px-2 py-1 text-left font-semibold whitespace-nowrap"
                         >
                           {cell}

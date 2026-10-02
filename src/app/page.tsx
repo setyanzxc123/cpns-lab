@@ -4,17 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "cn";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { getRepo } from "@/lib/repository";
-import { loadBank, CATEGORY_INFO } from "@/data/bank";
+import { loadBank } from "@/data/bank";
 import type { SessionResult } from "@/lib/types";
-import { Timer, BookOpen, BarChart3, Library, Bot, Database, TrendingUp } from "lucide-react";
+import { Timer, BookOpen } from "lucide-react";
 
 export default function HomePage() {
   const [results, setResults] = useState<SessionResult[]>([]);
   const [bankCount, setBankCount] = useState(0);
-  const [aiOn, setAiOn] = useState(false);
   const [dbOn, setDbOn] = useState(false);
 
   useEffect(() => {
@@ -22,7 +19,6 @@ export default function HomePage() {
       const repo = await getRepo();
       setResults(await repo.listResults());
       setBankCount((await loadBank()).length);
-      setAiOn(Boolean(process.env.NEXT_PUBLIC_HAS_GEMINI));
       setDbOn(Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL));
     })();
   }, []);
@@ -34,7 +30,6 @@ export default function HomePage() {
           100,
       )
     : null;
-  const best = results.reduce((a, r) => Math.max(a, r.totalScore), 0);
 
   return (
     <div className="space-y-6">
@@ -66,128 +61,27 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {(["TWK", "TIU", "TKP"] as const).map((c) => (
-          <Card key={c}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base" style={{ color: CATEGORY_INFO[c].color }}>
-                {c} — {CATEGORY_INFO[c].name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CardDescription>{CATEGORY_INFO[c].desc}</CardDescription>
-            </CardContent>
-          </Card>
-        ))}
+      <section className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border bg-card px-5 py-4">
+        <p className="text-sm">
+          <span className="text-xl font-bold">{bankCount}</span>{" "}
+          <span className="text-muted-foreground">soal tersedia</span>
+        </p>
+        <p className="text-sm">
+          <span className="text-xl font-bold">{results.length}</span>{" "}
+          <span className="text-muted-foreground">sesi dikerjakan</span>
+        </p>
+        <p className="text-sm">
+          <span className="text-xl font-bold">{avg !== null ? `${avg}%` : "—"}</span>{" "}
+          <span className="text-muted-foreground">rata-rata capaian</span>
+        </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg bg-blue-100 p-2.5 text-blue-700">
-              <TrendingUp className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{results.length}</p>
-              <p className="text-xs text-muted-foreground">Total pengerjaan</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg bg-green-100 p-2.5 text-green-700">
-              <BarChart3 className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{avg !== null ? `${avg}%` : "—"}</p>
-              <p className="text-xs text-muted-foreground">
-                Rata-rata capaian{results.length ? ` · terbaik ${best}` : ""}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg bg-purple-100 p-2.5 text-purple-700">
-              <Library className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{bankCount}</p>
-              <p className="text-xs text-muted-foreground">Soal tersedia</p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <FeatureCard
-          href="/statistik"
-          icon={<BarChart3 className="h-5 w-5" />}
-          title="Statistik & Analisis"
-          desc="Lihat kekuatan/kelemahan per subkategori dan latih ulang soal yang Anda salah."
-        />
-        <FeatureCard
-          href="/ai"
-          icon={<Bot className="h-5 w-5" />}
-          title="Tutor AI (Gemini)"
-          desc="Chat tutor, analisis skor, dan rencana belajar personal."
-          badge={aiOn ? <Badge className="bg-green-600">Aktif</Badge> : <Badge variant="outline">Butuh API key</Badge>}
-        />
-        <FeatureCard
-          href="/bank"
-          icon={<Library className="h-5 w-5" />}
-          title="Bank Soal"
-          desc={`${bankCount} soal siap pakai. Tambahkan soal sendiri atau impor file JSON.`}
-        />
-        <Card>
-          <CardContent className="flex items-start gap-3 p-4">
-            <div className="rounded-lg bg-amber-100 p-2.5 text-amber-700">
-              <Database className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-medium">
-                Penyimpanan {dbOn ? "Supabase" : "Perangkat"}
-                {dbOn && <Badge className="ml-2 bg-green-600">Terhubung</Badge>}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {dbOn
-                  ? "Progres tersinkron antar perangkat lewat akun Supabase Anda."
-                  : "Progres disimpan di perangkat ini. Pasang Supabase untuk sinkron antar perangkat."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <p className="text-xs text-muted-foreground">
+        Penyimpanan{" "}
+        {dbOn
+          ? "terhubung ke Supabase — progres tersinkron antar perangkat."
+          : "di perangkat ini — pasang Supabase untuk sinkron antar perangkat."}
+      </p>
     </div>
-  );
-}
-
-function FeatureCard({
-  href,
-  icon,
-  title,
-  desc,
-  badge,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  badge?: React.ReactNode;
-}) {
-  return (
-    <Link href={href} className="group">
-      <Card className="h-full transition-colors group-hover:border-blue-300">
-        <CardContent className="flex items-start gap-3 p-4">
-          <div className="rounded-lg bg-muted p-2.5 text-blue-700">{icon}</div>
-          <div>
-            <p className="font-medium">
-              {title} {badge}
-            </p>
-            <p className="text-sm text-muted-foreground">{desc}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
   );
 }

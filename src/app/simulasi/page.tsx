@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, RotateCcw, Home } from "lucide-react";
 
 const PRESETS: { name: string; desc: string; counts: Record<Category, number>; minutes: number }[] = [
@@ -144,10 +143,15 @@ export default function SimulasiPage() {
           <div className="grid grid-cols-3 gap-3">
             {(["TWK", "TIU", "TKP"] as Category[]).map((cat) => (
               <div key={cat}>
-                <label className="mb-1 block text-xs font-medium" style={{ color: CATEGORY_INFO[cat].color }}>
+                <label
+                  htmlFor={`jumlah-${cat.toLowerCase()}`}
+                  className="mb-1 block text-xs font-medium"
+                  style={{ color: CATEGORY_INFO[cat].color }}
+                >
                   {cat}
                 </label>
                 <Input
+                  id={`jumlah-${cat.toLowerCase()}`}
                   type="number"
                   min={0}
                   max={100}
@@ -160,10 +164,14 @@ export default function SimulasiPage() {
             ))}
           </div>
           <div className="max-w-48">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            <label
+              htmlFor="durasi-menit"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
               Durasi (menit)
             </label>
             <Input
+              id="durasi-menit"
               type="number"
               min={1}
               value={minutes}
@@ -186,7 +194,7 @@ export default function SimulasiPage() {
       </Card>
 
       {shortfall.length > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">Bank soal belum cukup untuk paket ini:</p>
@@ -197,7 +205,10 @@ export default function SimulasiPage() {
             </ul>
             <p className="mt-1 text-xs">
               Soal yang tersedia tetap akan dipakai, atau tambahkan soal di menu{" "}
-              <Badge variant="outline">Bank Soal</Badge>.
+              <Link href="/bank" className="font-medium underline underline-offset-2">
+                Bank Soal
+              </Link>
+              .
             </p>
           </div>
         </div>
