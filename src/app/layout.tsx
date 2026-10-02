@@ -49,7 +49,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-150">
+      <body className="flex h-full flex-col bg-background text-foreground transition-colors duration-150">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -57,7 +57,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SiteHeader />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 has-[.ai-page]:max-w-none has-[.ai-page]:px-4 lg:has-[.ai-page]:px-6 has-[.ai-page]:py-2 sm:has-[.ai-page]:py-3 has-[.ai-page]:pb-2 has-[.ai-page]:h-[calc(100dvh_-_57px)] has-[.ai-page]:overflow-hidden">
             <AuthGate>{children}</AuthGate>
           </main>
           <footer

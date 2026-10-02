@@ -922,7 +922,9 @@ export const PromptInput = ({
         ref={formRef}
         {...props}
       >
-        <InputGroup className="overflow-hidden">{children}</InputGroup>
+        <InputGroup className="border-0 bg-transparent shadow-none ring-0 rounded-[inherit] overflow-hidden">
+          {children}
+        </InputGroup>
       </form>
     </>
   );
@@ -1056,7 +1058,7 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
-      className={cn("field-sizing-content max-h-48 min-h-16", className)}
+      className={cn("field-sizing-content max-h-40 min-h-[38px]", className)}
       name="message"
       onCompositionEnd={handleCompositionEnd}
       onCompositionStart={handleCompositionStart}

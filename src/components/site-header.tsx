@@ -1,7 +1,5 @@
 "use client";
 
-// Header navigasi utama + status auth Supabase.
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -121,12 +119,13 @@ export function SiteHeader() {
     }
   }
 
-  // Login (Google) ditangani AuthGate di layout — header hanya menampilkan
-  // status user yang sudah masuk.
-
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2.5">
+      <div
+        className={`mx-auto flex w-full items-center gap-2 px-4 py-2.5 ${
+          pathname === "/ai" ? "max-w-none lg:px-6" : "max-w-6xl"
+        }`}
+      >
         <Link href="/" className="mr-2 flex items-center gap-2 font-bold text-blue-800 dark:text-blue-400">
           <GraduationCap className="h-6 w-6" />
           <span>CPNS Lab</span>

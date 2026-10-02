@@ -11,7 +11,6 @@ import type { ChatSession } from "@/lib/storage";
 import { getRepo } from "@/lib/repository";
 import { useSmoothText } from "@/hooks/use-smooth-text";
 import { loadBank } from "@/data/bank";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ChatHistoryList } from "@/components/chat-history";
@@ -35,12 +34,10 @@ import {
 } from "@/components/ai-elements/reasoning";
 import {
   PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
-import { Bot, Copy, History, Loader2, RefreshCcw, Sparkles } from "lucide-react";
+import { Copy, GraduationCap, History, Loader2, RefreshCcw } from "lucide-react";
 
 const LETTERS = ["A", "B", "C", "D", "E"];
 
@@ -92,11 +89,6 @@ function buildSeed(q: Question, choice: number | null): string {
   return lines.join("\n");
 }
 
-const FOLLOWUPS = [
-  "Jelaskan langkah pengerjaannya dengan cara lain",
-  "Kenapa pilihan saya kurang tepat?",
-  "Beri soal serupa untuk latihan",
-];
 
 function deriveTitle(messages: UIMessage[], context: ChatContext | null): string {
   if (context?.label) return `Soal ${context.label}`;
@@ -158,8 +150,6 @@ function AiChat() {
   // Protokol UIMessage: mendukung part reasoning dari server.
   const [transport] = useState(() => new DefaultChatTransport({ api: "/api/ai/chat" }));
   const { messages, sendMessage, setMessages, status, error, stop, regenerate } = useChat({ transport });
-  const [report, setReport] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
 
   // Seed percakapan baru dengan konteks soal dari deep-link (sekali)
   useEffect(() => {
@@ -184,15 +174,22 @@ function AiChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seedQuestion, choice, messages.length]);
 
-  // Auto-save sesi: setiap stream selesai (bukan per chunk)
+  // Auto-save sesi: setiap stream selesai (bukan per chunk).
+  // Membuka sesi lama tanpa pesan baru tidak menyimpan ulang agar urutan
+  // riwayat tidak terdorong ke atas.
   useEffect(() => {
     if ((status !== "ready" && status !== "error") || messages.length === 0) return;
     let cancelled = false;
     (async () => {
+      const signature = JSON.stringify(
+        messages.map((m) => ({ id: m.id, role: m.role, parts: m.parts })),
+      );
+      const existing = sessions.find((s) => s.id === (activeId ?? ""));
+      if (existing && JSON.stringify(existing.messages) === signature) return;
       const session: ChatSession = {
         id: activeId ?? `C-${Date.now()}`,
         title: deriveTitle(messages, context),
-        createdAt: Date.now(),
+        createdAt: existing?.createdAt ?? Date.now(),
         updatedAt: Date.now(),
         contextQuestionId: context?.id,
         contextLabel: context?.label,
@@ -211,7 +208,7 @@ function AiChat() {
     return () => {
       cancelled = true;
     };
-  }, [messages, status, activeId, context]);
+  }, [messages, status, activeId, context, sessions]);
 
   function newChat() {
     setActiveId(null);
@@ -261,21 +258,49 @@ function AiChat() {
     lastMessage?.role === "assistant" &&
     lastText.length === 0;
 
+  const historyList = (
+    <ChatHistoryList
+      sessions={sessions}
+      activeId={activeId}
+      onOpen={openSession}
+      onDelete={(id) => void deleteSession(id)}
+      onNew={newChat}
+    />
+  );
+
   return (
-    <div className="mx-auto flex w-full max-w-6xl gap-6">
-      {/* Sidebar riwayat — desktop */}
-      <aside className="hidden w-60 shrink-0 self-start md:sticky md:top-[72px] md:flex md:max-h-[calc(100vh-90px)] md:flex-col">
-        <ChatHistoryList
-          sessions={sessions}
-          activeId={activeId}
-          onOpen={openSession}
-          onDelete={(id) => void deleteSession(id)}
-          onNew={newChat}
-        />
+    <div className="ai-page flex h-full w-full gap-4 sm:gap-5 overflow-hidden">
+      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden border-r pr-4 md:flex">
+        <h1 className="px-2 pb-3 text-lg font-bold tracking-tight">Tutor AI</h1>
+        {historyList}
       </aside>
 
-      <div className="min-w-0 flex-1 space-y-5">
-        <div>
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center justify-between gap-2 pb-1 md:hidden">
+          <h1 className="text-lg font-bold tracking-tight">Tutor AI</h1>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Buka riwayat percakapan"
+                >
+                  <History className="h-4 w-4" aria-hidden />
+                  Riwayat
+                </Button>
+              }
+            />
+            <SheetContent side="left" className="flex w-72 flex-col gap-3 p-4">
+              <SheetHeader className="p-0">
+                <SheetTitle>Riwayat Percakapan</SheetTitle>
+              </SheetHeader>
+              {historyList}
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-1.5 pb-2">
           {qid ? (
             <Link
               href="/latihan"
@@ -284,205 +309,71 @@ function AiChat() {
               ← Kembali ke latihan
             </Link>
           ) : null}
-          <div className="flex items-center gap-2">
-            <h1 className="mt-1 text-2xl font-bold">Tutor AI</h1>
-            {/* Riwayat — mobile */}
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="ml-auto md:hidden"
-                    aria-label="Buka riwayat percakapan"
-                  >
-                    <History className="h-4 w-4" aria-hidden />
-                    Riwayat
-                  </Button>
-                }
-              />
-              <SheetContent side="left" className="flex w-72 flex-col gap-2 p-4">
-                <SheetHeader className="p-0">
-                  <SheetTitle>Riwayat Percakapan</SheetTitle>
-                </SheetHeader>
-                <ChatHistoryList
-                  sessions={sessions}
-                  activeId={activeId}
-                  onOpen={openSession}
-                  onDelete={(id) => void deleteSession(id)}
-                  onNew={newChat}
-                />
-              </SheetContent>
-            </Sheet>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Bertanya soal materi TWK/TIU/TKP, minta soal latihan baru, atau minta analisis progres belajar Anda.
-          </p>
+          {!aiOn && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              Chat butuh <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50 dark:text-amber-200">GEMINI_API_KEY</code> — lihat README.
+            </div>
+          )}
         </div>
 
-        {!aiOn && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-            Chat &amp; analisis skor butuh <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50 dark:text-amber-200">GEMINI_API_KEY</code> — lihat README untuk pemasangan.
-          </div>
-        )}
-
-        {/* Konteks soal dari tautan latihan */}
-        {context ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-xs text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300">
-            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span>
-              Konteks aktif: <b>{context.label}</b>
-            </span>
-            <div className="ml-auto flex flex-wrap gap-1.5">
-              {FOLLOWUPS.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => sendMessage({ text: f })}
-                  className="rounded-full border border-blue-300 px-2.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-blue-100 dark:border-blue-800 dark:hover:bg-blue-950"
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : qid && seedQuestion === null ? (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-            Soal dari tautan tidak ditemukan di bank soal — chat berjalan tanpa konteks.
-          </div>
-        ) : null}
-
-        {/* Analisis skor */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-purple-600" aria-hidden /> Analisis Skor &amp; Rencana Belajar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button
-              onClick={async () => {
-                setAnalyzing(true);
-                setReport(null);
-                try {
-                  const { getRepo: getRepository } = await import("@/lib/repository");
-                  const repo = await getRepository();
-                  const { loadBank } = await import("@/data/bank");
-                  const [results, bank, wrong] = await Promise.all([
-                    repo.listResults(),
-                    loadBank(),
-                    repo.listWrong(),
-                  ]);
-                  const byId = new Map(bank.map((q) => [q.id, q]));
-                  const subAcc = new Map<string, { sub: string; category: string; correct: number; total: number }>();
-                  for (const r of [...results].sort((a, b) => a.finishedAt - b.finishedAt)) {
-                    for (const a of r.answers) {
-                      const q = byId.get(a.questionId);
-                      if (!q) continue;
-                      const cur =
-                        subAcc.get(q.sub) ?? { sub: q.sub, category: q.category, correct: 0, total: 0 };
-                      cur.total += 1;
-                      if (a.correct) cur.correct += 1;
-                      subAcc.set(q.sub, cur);
-                    }
-                  }
-                  const res = await fetch("/api/ai/analyze", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      history: results.map((r) => ({
-                        date: new Date(r.finishedAt).toISOString().slice(0, 10),
-                        mode: r.mode,
-                        totalScore: r.totalScore,
-                        maxScore: r.maxScore,
-                        subScores: r.subScores,
-                      })),
-                      subAccuracy: [...subAcc.values()].map((s) => ({
-                        ...s,
-                        pct: Math.round((s.correct / Math.max(1, s.total)) * 100),
-                      })),
-                      wrongCount: Object.keys(wrong).length,
-                    }),
-                  });
-                  const data = await res.json();
-                  setReport(data.report ?? "Tidak ada hasil.");
-                } catch {
-                  setReport("Gagal menghubungi AI. Periksa koneksi atau GEMINI_API_KEY.");
-                } finally {
-                  setAnalyzing(false);
-                }
-              }}
-              disabled={analyzing}
-            >
-              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
-              Analisis progres saya
-            </Button>
-            {report && (
-              <div className="prose-sm max-w-none whitespace-pre-wrap rounded-lg border border-purple-200 bg-purple-50 p-4 text-sm leading-relaxed text-purple-950 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-200">
-                {report}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Chat */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Bot className="h-4 w-4 text-blue-700 dark:text-blue-400" aria-hidden /> Chat dengan Tutor
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Conversation className="h-[28rem] rounded-lg border">
-              <ConversationContent className="p-3">
-                {messages.length === 0 && !context && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <Conversation className="min-h-0 flex-1">
+            <ConversationContent className="mx-auto w-full max-w-4xl p-3 sm:p-5 pb-6 gap-6">
+              {messages.length === 0 && !context && (
+                <div className="flex size-full flex-col items-center justify-center gap-5 text-center">
                   <ConversationEmptyState
                     title="Belum ada percakapan"
                     description="Mulai bertanya, atau coba salah satu contoh berikut:"
-                    icon={<Sparkles className="h-5 w-5" aria-hidden />}
-                  >
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {[
-                        "Buatkan 5 soal latihan Pancasila beserta pembahasan",
-                        "Trik cepat menjawab deret angka di TIU",
-                        "Jelaskan perbedaan norma hukum dan kesusilaan",
-                      ].map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => sendMessage({ text: s })}
-                          className="rounded-full border px-3 py-1 text-xs hover:bg-muted"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </ConversationEmptyState>
-                )}
-                {messages.map((m) => {
-                  const text = messageText(m);
-                  const reasoning = messageReasoning(m);
-                  const isLast = m.id === messages[messages.length - 1]?.id;
-                  const streaming = status === "streaming" && isLast;
+                    icon={<GraduationCap className="h-6 w-6 text-blue-600 dark:text-blue-400" aria-hidden />}
+                    className="p-0"
+                  />
+                  <div className="flex max-w-xl flex-wrap justify-center gap-2">
+                    {[
+                      "Buatkan 5 soal latihan Pancasila beserta pembahasan",
+                      "Trik cepat menjawab deret angka di TIU",
+                      "Jelaskan perbedaan norma hukum dan kesusilaan",
+                    ].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => sendMessage({ text: s })}
+                        className="rounded-full border px-3 py-1 text-xs transition-colors hover:bg-muted text-left"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {messages.map((m) => {
+                const text = messageText(m);
+                const reasoning = messageReasoning(m);
+                const isLast = m.id === messages[messages.length - 1]?.id;
+                const streaming = status === "streaming" && isLast;
+                if (m.role === "user") {
                   return (
-                    <Message key={m.id} from={m.role}>
+                    <Message key={m.id} from="user">
                       <MessageContent>
-                        {reasoning && (
-                          <Reasoning isStreaming={streaming && text.length === 0}>
-                            <ReasoningTrigger />
-                            <ReasoningContent>{reasoning}</ReasoningContent>
-                          </Reasoning>
-                        )}
-                        {m.role === "assistant" ? (
-                          <AssistantMessage
-                            text={text}
-                            streaming={streaming && text.length > 0}
-                          />
-                        ) : (
-                          <MessageResponse>{text}</MessageResponse>
-                        )}
+                        <MessageResponse>{text}</MessageResponse>
                       </MessageContent>
-                      {m.role === "assistant" && text && (
-                        <MessageActions className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                    </Message>
+                  );
+                }
+                return (
+                  <Message key={m.id} from="assistant" className="max-w-full">
+                    <div className="flex w-full min-w-0 flex-col gap-1.5">
+                      {reasoning && (
+                        <Reasoning isStreaming={streaming && text.length === 0}>
+                          <ReasoningTrigger />
+                          <ReasoningContent>{reasoning}</ReasoningContent>
+                        </Reasoning>
+                      )}
+                      <AssistantMessage
+                        text={text}
+                        streaming={streaming && text.length > 0}
+                      />
+                      {text && (
+                        <MessageActions className="opacity-80 transition-opacity md:opacity-0 md:group-hover:opacity-100 group-focus-within:opacity-100">
                           <MessageAction
                             tooltip="Salin"
                             aria-label="Salin balasan"
@@ -501,56 +392,61 @@ function AiChat() {
                           )}
                         </MessageActions>
                       )}
-                    </Message>
-                  );
-                })}
-                {waitingForFirstToken && (
-                  <Message from="assistant">
-                    <MessageContent>
-                      <div className="flex items-center gap-1 py-1">
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
-                        <span className="sr-only">Tutor sedang menulis…</span>
-                      </div>
-                    </MessageContent>
+                    </div>
                   </Message>
-                )}
-                {emptyReply && (
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-                    AI tidak mengirim balasan — kemungkinan kuota harian API habis atau terjadi gangguan. Coba lagi nanti.
+                );
+              })}
+              {waitingForFirstToken && (
+                <Message from="assistant" className="max-w-full">
+                  <div className="flex items-center gap-1.5 px-1 py-1">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+                    <span className="sr-only">Tutor sedang menulis…</span>
                   </div>
-                )}
-              </ConversationContent>
-              <ConversationScrollButton />
-            </Conversation>
-            {error && (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
-                Gagal: {error.message}. Pastikan GEMINI_API_KEY terpasang dan server berjalan.
-              </div>
-            )}
-            <PromptInput
-              onSubmit={({ text }) => {
-                const t = (text ?? "").trim();
-                if (!t) return;
-                sendMessage({ text: t });
-              }}
-            >
-              <PromptInputBody>
-                <PromptInputTextarea
-                  aria-label="Pesan untuk tutor AI"
-                  placeholder="Tulis pertanyaan… (Enter untuk kirim)"
-                />
-              </PromptInputBody>
-              <PromptInputFooter>
-                <span className="text-[11px] text-muted-foreground">
-                  Enter kirim · Shift+Enter baris baru
-                </span>
-                <PromptInputSubmit status={status} onStop={() => stop()} aria-label="Kirim pesan" />
-              </PromptInputFooter>
-            </PromptInput>
-          </CardContent>
-        </Card>
+                </Message>
+              )}
+              {emptyReply && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                  AI tidak mengirim balasan — kemungkinan kuota harian API habis atau terjadi gangguan. Coba lagi nanti.
+                </div>
+              )}
+            </ConversationContent>
+            <ConversationScrollButton className="bottom-4 z-20" />
+          </Conversation>
+
+          <div className="shrink-0 bg-background p-3 sm:p-4">
+            <div className="mx-auto max-w-4xl">
+              {error && (
+                <div className="mb-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive shadow-xs">
+                  Gagal: {error.message}. Pastikan GEMINI_API_KEY terpasang dan server berjalan.
+                </div>
+              )}
+              <PromptInput
+                onSubmit={({ text }) => {
+                  const t = (text ?? "").trim();
+                  if (!t) return;
+                  sendMessage({ text: t });
+                }}
+                className="w-full rounded-2xl border border-input bg-card transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30"
+              >
+                <div className="flex w-full items-end gap-2 px-3 py-1.5">
+                  <PromptInputTextarea
+                    aria-label="Pesan untuk tutor AI"
+                    placeholder="Tulis pertanyaan… (Enter kirim, Shift+Enter baris baru)"
+                    className="min-h-[38px] max-h-36 flex-1 resize-none bg-transparent py-2 text-sm leading-relaxed outline-none border-0 shadow-none ring-0 focus-visible:ring-0 placeholder:text-muted-foreground"
+                  />
+                  <PromptInputSubmit
+                    status={status}
+                    onStop={() => stop()}
+                    aria-label="Kirim pesan"
+                    className="h-8 w-8 shrink-0 rounded-xl mb-1"
+                  />
+                </div>
+              </PromptInput>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
