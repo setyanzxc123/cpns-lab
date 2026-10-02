@@ -4,6 +4,7 @@
 // dan Supabase (user login). Halaman tidak perlu tahu bedanya.
 
 import type { Question, SessionResult } from "./types";
+import type { ChatSession } from "./storage";
 import { localStore } from "./storage";
 import { createClient } from "@/lib/supabase/client";
 import { syncGuestToCloud } from "./sync";
@@ -19,6 +20,9 @@ export interface Repository {
   clearWrong(ids?: string[]): Promise<void>;
   listCustomQuestions(): Promise<Question[]>;
   saveCustomQuestions(qs: Question[]): Promise<void>;
+  listChatSessions(): Promise<ChatSession[]>;
+  saveChatSession(s: ChatSession): Promise<ChatSession[]>;
+  deleteChatSession(id: string): Promise<ChatSession[]>;
 }
 
 // Local guest repository
@@ -45,6 +49,15 @@ export const localRepo: Repository = {
   },
   async saveCustomQuestions(qs) {
     localStore.saveCustomQuestions(qs);
+  },
+  async listChatSessions() {
+    return localStore.getChatSessions();
+  },
+  async saveChatSession(s) {
+    return localStore.saveChatSession(s);
+  },
+  async deleteChatSession(id) {
+    return localStore.deleteChatSession(id);
   },
 };
 
@@ -141,6 +154,66 @@ class SupabaseRepo implements Repository {
     } catch {
       // offline — lokal sudah tersimpan; sinkron penuh menyusul saat login sync
     }
+  }
+  async listChatSessions(): Promise<ChatSession[]> {
+    // Cloud kanonik + gabungkan sesi lokal yang belum ter-push (by id).
+    let cloud: ChatSession[] = [];
+    try {
+      const sb = createClient();
+      const { data } = await sb
+        .from("chat_sessions")
+        .select("id, title, context_question_id, context_label, messages, created_at, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(50);
+      cloud = (data ?? []).map((row) => ({
+        id: row.id as string,
+        title: (row.title as string) || "Percakapan",
+        createdAt: Date.parse(row.created_at as string),
+        updatedAt: Date.parse(row.updated_at as string),
+        contextQuestionId: (row.context_question_id as string) ?? undefined,
+        contextLabel: (row.context_label as string) ?? undefined,
+        messages: (row.messages as ChatSession["messages"]) ?? [],
+      }));
+    } catch {
+      // offline — pakai lokal saja
+    }
+    const byId = new Map<string, ChatSession>();
+    for (const s of [...localStore.getChatSessions(), ...cloud]) {
+      if (s?.id) byId.set(s.id, s);
+    }
+    return [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50);
+  }
+  async saveChatSession(s: ChatSession): Promise<ChatSession[]> {
+    // Offline-first: selalu tulis salinan lokal, lalu upsert ke cloud saat online.
+    const next = localStore.saveChatSession(s);
+    try {
+      const sb = createClient();
+      await sb.from("chat_sessions").upsert(
+        {
+          id: s.id,
+          title: s.title,
+          context_question_id: s.contextQuestionId ?? null,
+          context_label: s.contextLabel ?? null,
+          messages: s.messages,
+          updated_at: new Date(s.updatedAt).toISOString(),
+        },
+        { onConflict: "id" },
+      );
+    } catch {
+      // offline — salinan lokal ada; akan tersinkron saat save berikutnya online
+    }
+    return next;
+  }
+  async deleteChatSession(id: string): Promise<ChatSession[]> {
+    const next = localStore.deleteChatSession(id);
+    try {
+      const sb = createClient();
+      await sb.from("chat_sessions").delete().eq("id", id);
+    } catch {
+      // offline — lokal terhapus; baris cloud tersisa diabaikan saat merge
+      // (sesi tidak ada di lokal & cloud tetap muncul setelah list berikutnya)
+    }
+    return next;
   }
 }
 

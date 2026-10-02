@@ -220,3 +220,54 @@ create policy "Public read questions"
   on public.questions for select
   to anon, authenticated
   using (true);
+
+-- =============================================================================
+-- 5. TABEL: chat_sessions (Riwayat percakapan Tutor AI, sinkron per akun)
+-- Messages disimpan utuh (jsonb) — dibuat & diperbarui client (stateless,
+-- store=false di sisi Google). updated_at ditetapkan client (last-write-wins).
+-- =============================================================================
+create table if not exists public.chat_sessions (
+  id text primary key,                -- "C-<timestamp>" dari client
+  user_id uuid references auth.users(id) on delete cascade default auth.uid(),
+  title text not null default 'Percakapan',
+  context_question_id text,           -- id soal bila mulai dari "Tanya lebih lanjut"
+  context_label text,                 -- label ringkas konteks, mis. "TIU — Pola Bilangan"
+  messages jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_chat_sessions_user_updated
+  on public.chat_sessions (user_id, updated_at desc);
+
+drop trigger if exists tr_chat_sessions_user_id on public.chat_sessions;
+create trigger tr_chat_sessions_user_id
+  before insert on public.chat_sessions
+  for each row execute function public.handle_set_user_id();
+
+alter table public.chat_sessions enable row level security;
+
+drop policy if exists "Users can view own chat sessions" on public.chat_sessions;
+create policy "Users can view own chat sessions"
+  on public.chat_sessions for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert own chat sessions" on public.chat_sessions;
+create policy "Users can insert own chat sessions"
+  on public.chat_sessions for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update own chat sessions" on public.chat_sessions;
+create policy "Users can update own chat sessions"
+  on public.chat_sessions for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can delete own chat sessions" on public.chat_sessions;
+create policy "Users can delete own chat sessions"
+  on public.chat_sessions for delete
+  to authenticated
+  using (auth.uid() = user_id);

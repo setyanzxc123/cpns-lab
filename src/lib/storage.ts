@@ -10,6 +10,27 @@ const K_WRONG = "cpns.wrong";
 const K_CUSTOM = "cpns.customQuestions";
 const K_RUNNING = "cpns.runningExam";
 const K_EXPLAIN_CACHE = "cpns.aiExplains";
+const K_CHAT_SESSIONS = "cpns.chatSessions";
+
+/** Satu pesan riwayat chat — struktur longgar mengikuti UIMessage AI SDK. */
+export interface ChatSessionMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  parts: Array<{ type: string; text?: string } & Record<string, unknown>>;
+}
+
+/** Sesi percakapan tutor AI yang tersimpan lokal. */
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  /** Id soal bila percakapan bermula dari tombol "Tanya lebih lanjut". */
+  contextQuestionId?: string;
+  /** Label ringkas konteks, mis. "TIU — Pola Bilangan". */
+  contextLabel?: string;
+  messages: ChatSessionMessage[];
+}
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -86,6 +107,28 @@ export const localStore = {
   getAllAiExplanations(): Record<string, string> {
     return read<Record<string, string>>(K_EXPLAIN_CACHE, {});
   },
+  getChatSessions(): ChatSession[] {
+    return read<ChatSession[]>(K_CHAT_SESSIONS, []).sort((a, b) => b.updatedAt - a.updatedAt);
+  },
+  saveChatSession(session: ChatSession): ChatSession[] {
+    const all = localStore.getChatSessions();
+    const existing = all.find((s) => s.id === session.id);
+    const merged: ChatSession = {
+      ...session,
+      // Judul dipertahankan dari sesi lama bila tidak dikirim ulang
+      title: session.title || existing?.title || "Percakapan",
+      createdAt: existing?.createdAt ?? session.createdAt,
+      updatedAt: Date.now(),
+    };
+    const next = [merged, ...all.filter((s) => s.id !== session.id)].slice(0, 50);
+    write(K_CHAT_SESSIONS, next);
+    return next;
+  },
+  deleteChatSession(id: string): ChatSession[] {
+    const next = localStore.getChatSessions().filter((s) => s.id !== id);
+    write(K_CHAT_SESSIONS, next);
+    return next;
+  },
   hasGuestData(): boolean {
     const results = localStore.getResults();
     const wrong = localStore.getWrong();
@@ -97,6 +140,7 @@ export const localStore = {
     window.localStorage.removeItem(K_RESULTS);
     window.localStorage.removeItem(K_WRONG);
     window.localStorage.removeItem(K_CUSTOM);
+    window.localStorage.removeItem(K_CHAT_SESSIONS);
   },
   getLastSync(): string | null {
     if (typeof window === "undefined") return null;
