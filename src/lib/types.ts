@@ -112,7 +112,8 @@ export interface Glyph {
 export type OptionVisual =
   | Glyph
   | { kind: "dual-v"; top: Glyph; bottom: Glyph }
-  | { kind: "dual-h"; left: Glyph; right: Glyph };
+  | { kind: "dual-h"; left: Glyph; right: Glyph }
+  | { kind: "image"; src: string };
 
 /**
  * Spesifikasi visual soal figural — mencakup pola standar tes IQ internasional:
@@ -122,6 +123,7 @@ export type OptionVisual =
  * - net: jaring-jaring / lipatan 3D
  * - grid-9: matriks 3x3 Raven's Progressive Matrices (mendukung multiple '?' / missing cells)
  * - grid-4: matriks 2x2 Cattell Culture Fair
+ * - image: visual berbasis crop gambar dari buku/dokumen asli
  */
 export type VisualSpec =
   | { kind: "series"; cells: (Glyph | "?" | null)[] }
@@ -129,7 +131,8 @@ export type VisualSpec =
   | { kind: "odd-five"; cells: Glyph[] }
   | { kind: "net"; cells: (Glyph | null)[]; cols: number }
   | { kind: "grid-9"; cells: (Glyph | "?" | null)[] }
-  | { kind: "grid-4"; cells: (Glyph | "?" | null)[] };
+  | { kind: "grid-4"; cells: (Glyph | "?" | null)[] }
+  | { kind: "image"; src: string; alt?: string };
 
 export interface QuestionOption {
   text?: string;

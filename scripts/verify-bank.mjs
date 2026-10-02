@@ -152,9 +152,18 @@ async function run() {
     // 7. VERIFIKASI VISUAL FIGURAL (SPEC VEKTOR STANDAR PSIKOMETRI INTERNASIONAL)
     if (q.visual) {
       const v = q.visual;
-      const KNOWN_KINDS = ["series", "analogy", "odd-five", "net", "grid-9", "grid-4"];
+      const KNOWN_KINDS = ["series", "analogy", "odd-five", "net", "grid-9", "grid-4", "image"];
       if (!KNOWN_KINDS.includes(v.kind)) {
         errors.push(`${prefix} [VISUAL] kind '${v.kind}' tidak dikenal (harus: ${KNOWN_KINDS.join(", ")}).`);
+      } else if (v.kind === "image") {
+        if (!v.src || typeof v.src !== "string") {
+          errors.push(`${prefix} [VISUAL] image butuh 'src'.`);
+        } else {
+          const imgPath = path.resolve("public", v.src.replace(/^\//, ""));
+          if (!fsSync.existsSync(imgPath)) {
+            errors.push(`${prefix} [VISUAL] file image tidak ditemukan: ${v.src}`);
+          }
+        }
       } else {
         const cells = v.cells;
         const validateGlyph = (g, where) => {
@@ -278,7 +287,16 @@ async function run() {
     if (q.options) {
       for (const [oi, opt] of q.options.entries()) {
         if (opt.visual) {
-          if (opt.visual.kind === "dual-v") {
+          if (opt.visual.kind === "image") {
+            if (!opt.visual.src || typeof opt.visual.src !== "string") {
+              errors.push(`${prefix} [VISUAL OPSI ${oi}] image butuh 'src'.`);
+            } else {
+              const imgPath = path.resolve("public", opt.visual.src.replace(/^\//, ""));
+              if (!fsSync.existsSync(imgPath)) {
+                errors.push(`${prefix} [VISUAL OPSI ${oi}] file image tidak ditemukan: ${opt.visual.src}`);
+              }
+            }
+          } else if (opt.visual.kind === "dual-v") {
             if (!opt.visual.top || !opt.visual.bottom) {
               errors.push(`${prefix} [VISUAL OPSI ${oi}] dual-v butuh top dan bottom.`);
             }
@@ -287,7 +305,7 @@ async function run() {
               errors.push(`${prefix} [VISUAL OPSI ${oi}] dual-h butuh left dan right.`);
             }
           } else if (opt.visual.kind) {
-            errors.push(`${prefix} [VISUAL OPSI ${oi}] opsi memakai VisualSpec '${opt.visual.kind}' yang tidak sah; opsi harus Glyph langsung atau dual-v/dual-h.`);
+            errors.push(`${prefix} [VISUAL OPSI ${oi}] opsi memakai VisualSpec '${opt.visual.kind}' yang tidak sah; opsi harus Glyph langsung, dual-v/dual-h, atau kind: 'image'.`);
           } else if (!Array.isArray(opt.visual.shapes) || opt.visual.shapes.length === 0) {
             errors.push(`${prefix} [VISUAL OPSI ${oi}] Glyph tanpa shapes.`);
           } else {

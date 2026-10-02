@@ -416,6 +416,18 @@ function Cell({
  * Renderer spesifikasi visual figural untuk batang soal.
  */
 export function VisualPanel({ spec }: { spec: VisualSpec }) {
+  if (spec.kind === "image") {
+    return (
+      <div className="flex justify-center p-2">
+        <img
+          src={spec.src}
+          alt={spec.alt ?? "Stimulus Soal Figural"}
+          className="max-h-72 w-auto max-w-full rounded-lg border bg-white p-2 shadow-sm object-contain"
+        />
+      </div>
+    );
+  }
+
   if (spec.kind === "grid-9") {
     return (
       <div className="grid w-fit grid-cols-3 gap-1.5">
@@ -488,6 +500,18 @@ export function VisualPanel({ spec }: { spec: VisualSpec }) {
  * bertingkat (dual-v / dual-h) untuk soal dengan 2 kotak tanda tanya.
  */
 export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
+  if ("kind" in glyph && glyph.kind === "image") {
+    return (
+      <div className="flex h-16 w-full items-center justify-center p-0.5">
+        <img
+          src={glyph.src}
+          alt="Pilihan visual"
+          className="max-h-16 w-auto max-w-full rounded border bg-white p-0.5 object-contain"
+        />
+      </div>
+    );
+  }
+
   if ("kind" in glyph && glyph.kind === "dual-v") {
     return (
       <div className="flex flex-col items-center gap-1">

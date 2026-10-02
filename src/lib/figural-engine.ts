@@ -418,6 +418,13 @@ export function createDualOptionHorizontal(
 export function validateFiguralSpec(spec: VisualSpec): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
+  if (spec.kind === "image") {
+    if (!spec.src || typeof spec.src !== "string") {
+      errors.push("Image visual butuh atribut 'src'.");
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
   const KNOWN_KINDS = ["series", "analogy", "odd-five", "net", "grid-9", "grid-4"];
   if (!KNOWN_KINDS.includes(spec.kind)) {
     errors.push(`Pola kind '${spec.kind}' tidak dikenal (harus salah satu dari: ${KNOWN_KINDS.join(", ")})`);
