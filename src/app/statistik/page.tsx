@@ -9,13 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { BarChart3, Trash2, Repeat } from "lucide-react";
+import { BarChart3, Bot, Loader2, Sparkles, Trash2, Repeat } from "lucide-react";
 
 export default function StatistikPage() {
   const [results, setResults] = useState<SessionResult[]>([]);
   const [bank, setBank] = useState<Question[]>([]);
   const [wrong, setWrong] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const aiOn = Boolean(process.env.NEXT_PUBLIC_HAS_GEMINI);
 
   useEffect(() => {
     (async () => {
@@ -54,6 +57,50 @@ export default function StatistikPage() {
     const repo = await getRepo();
     await repo.clearWrong();
     setWrong({});
+  }
+
+  async function runAnalysis() {
+    setAnalyzing(true);
+    setReport(null);
+    try {
+      const byId = new Map(bank.map((q) => [q.id, q]));
+      const subAcc = new Map<string, { sub: string; category: string; correct: number; total: number }>();
+      for (const r of [...results].sort((a, b) => a.finishedAt - b.finishedAt)) {
+        for (const a of r.answers) {
+          const q = byId.get(a.questionId);
+          if (!q) continue;
+          const cur =
+            subAcc.get(q.sub) ?? { sub: q.sub, category: q.category, correct: 0, total: 0 };
+          cur.total += 1;
+          if (a.correct) cur.correct += 1;
+          subAcc.set(q.sub, cur);
+        }
+      }
+      const res = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          history: results.map((r) => ({
+            date: new Date(r.finishedAt).toISOString().slice(0, 10),
+            mode: r.mode,
+            totalScore: r.totalScore,
+            maxScore: r.maxScore,
+            subScores: r.subScores,
+          })),
+          subAccuracy: [...subAcc.values()].map((s) => ({
+            ...s,
+            pct: Math.round((s.correct / Math.max(1, s.total)) * 100),
+          })),
+          wrongCount: Object.keys(wrong).length,
+        }),
+      });
+      const data = await res.json();
+      setReport(data.report ?? "Tidak ada hasil.");
+    } catch {
+      setReport("Gagal menghubungi AI. Periksa koneksi atau GEMINI_API_KEY.");
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   if (loading) return <p className="text-center text-muted-foreground">Memuat statistik…</p>;
@@ -106,6 +153,42 @@ export default function StatistikPage() {
                 </div>
               );
             })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-purple-600" aria-hidden />
+            Analisis Skor &amp; Rencana Belajar
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Evaluasi otomatis berdasarkan akurasi jawaban dan kelemahan sub-materi TWK/TIU/TKP Anda.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => void runAnalysis()} disabled={analyzing || !aiOn}>
+              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
+              Analisis progres saya
+            </Button>
+            {report && (
+              <Link href="/ai" className={buttonVariants({ variant: "outline" })}>
+                <Bot className="h-4 w-4 text-blue-600" aria-hidden />
+                Konsultasikan ke Tutor
+              </Link>
+            )}
+          </div>
+          {!aiOn && (
+            <p className="text-xs text-muted-foreground">
+              Analisis butuh <code className="rounded bg-muted px-1">GEMINI_API_KEY</code> — lihat README.
+            </p>
+          )}
+          {report && (
+            <div className="prose-sm max-w-none whitespace-pre-wrap rounded-lg border border-purple-200 bg-purple-50/70 p-4 text-sm leading-relaxed text-purple-950 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-200">
+              {report}
+            </div>
+          )}
         </CardContent>
       </Card>
 
