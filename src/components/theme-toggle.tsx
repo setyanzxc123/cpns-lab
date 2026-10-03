@@ -18,7 +18,7 @@ export function ThemeToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 text-muted-foreground"
+        className="touch-target text-muted-foreground"
         aria-label="Ganti tema"
         disabled
       >
@@ -33,7 +33,7 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 text-foreground transition-colors hover:bg-muted"
+      className="touch-target text-foreground transition-colors hover:bg-muted"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       title={isDark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
       aria-label="Ganti tema"

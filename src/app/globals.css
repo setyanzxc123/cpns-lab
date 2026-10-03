@@ -16,7 +16,8 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 4.6:1 di atas putih — label kecil 11-12px tetap lolos WCAG AA. */
+  --muted-foreground: oklch(0.497 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -24,6 +25,11 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.546 0.245 262.881);
+  /* Status lulus/gagal — teks & badge aman kontras di tema terang. */
+  --success: oklch(0.44 0.128 165.612);
+  --success-foreground: oklch(0.985 0 0);
+  --danger: oklch(0.5 0.21 27.325);
+  --danger-foreground: oklch(0.985 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -58,6 +64,10 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.707 0.165 254.624);
+  --success: oklch(0.75 0.14 165.612);
+  --success-foreground: oklch(0.205 0 0);
+  --danger: oklch(0.704 0.191 22.216);
+  --danger-foreground: oklch(0.205 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -70,6 +80,10 @@
 }
 
 @theme inline {
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -134,4 +148,59 @@ button:not(:disabled),
 [role="checkbox"],
 label:has([role="checkbox"], input[type="checkbox"]) {
   cursor: pointer;
+}
+
+/* Area sentuh minimal 44px pada perangkat sentuh; ukuran visual desktop tak berubah. */
+@media (pointer: coarse) {
+  .touch-target {
+    position: relative;
+  }
+  .touch-target::before {
+    content: "";
+    position: absolute;
+    inset: -7px;
+  }
+}
+
+/* Hormati preferensi gerak tereduksi: hentikan animasi dekoratif.
+   Spinner dipertahankan karena merupakan umpan balik status, bukan dekorasi. */
+@keyframes typing-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+[data-typing-dot] {
+  animation: typing-pulse 0.9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+[data-typing-dot]:nth-child(2) {
+  animation-delay: -0.15s;
+}
+[data-typing-dot]:nth-child(3) {
+  animation-delay: -0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-typing-dot],
+  .animate-pulse {
+    animation: none;
+  }
+  [data-typing-dot] {
+    opacity: 0.7;
+  }
+}
+
+/* Fokus keyboard seragam untuk tombol di luar komponen shadcn. */
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 45%, transparent);
 }

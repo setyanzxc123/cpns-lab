@@ -10,9 +10,19 @@ import { useEffect, useRef, useState } from "react";
 export function useSmoothText(text: string, active: boolean) {
   const [displayed, setDisplayed] = useState(() => (active ? "" : text));
   const countRef = useRef(active ? 0 : text.length);
+  // Gerak tereduksi: tampilkan teks seketika tanpa efek ketik.
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    if (!active) {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!active || reducedMotion) {
       countRef.current = text.length;
       setDisplayed(text);
       return;
@@ -36,7 +46,7 @@ export function useSmoothText(text: string, active: boolean) {
       setDisplayed(text.slice(0, countRef.current));
     }, 24);
     return () => clearInterval(id);
-  }, [text, active]);
+  }, [text, active, reducedMotion]);
 
-  return active ? displayed : text;
+  return active && reducedMotion ? text : displayed;
 }

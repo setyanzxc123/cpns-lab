@@ -315,7 +315,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                   onClick={() => changeCurrentIndex(i)}
                   aria-pressed={i === current}
                   aria-label={`Soal ${i + 1}${flagged ? " — ditandai ragu-ragu" : answered ? " — terjawab" : " — belum dijawab"}`}
-                  className={`relative h-8 w-8 rounded text-xs font-semibold transition-colors after:absolute after:-inset-1.5 after:content-[''] ${
+                  className={`focus-ring relative h-8 w-8 rounded text-xs font-semibold transition-colors after:absolute after:-inset-1.5 after:content-[''] ${
                     i === current
                       ? "bg-primary text-primary-foreground ring-2 ring-offset-1 ring-primary"
                       : answered
@@ -416,7 +416,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                         onClick={() => setChoices((c) => ({ ...c, [q.id]: i }))}
                         aria-pressed={selected}
                         aria-label={`Pilihan ${LETTERS[i]}${selected ? " — dipilih" : ""}`}
-                        className={`group relative flex flex-col items-center justify-between gap-2 rounded-xl border p-2.5 text-center transition-all hover:border-primary/60 hover:shadow-sm ${
+                        className={`focus-ring group relative flex flex-col items-center justify-between gap-2 rounded-xl border p-2.5 text-center transition-all hover:border-primary/60 hover:shadow-sm ${
                           selected ? "border-primary bg-primary/5 ring-2 ring-primary/40 shadow-sm" : "bg-card hover:bg-muted/40"
                         } ${feedbackCls} ${showFeedback ? "cursor-default" : ""}`}
                       >
@@ -429,10 +429,10 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                             {LETTERS[i]}
                           </span>
                           {showFeedback && q.category !== "TKP" && i === q.answer && (
-                            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" aria-hidden />
+                            <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden />
                           )}
                           {showFeedback && q.category !== "TKP" && selected && i !== q.answer && (
-                            <XCircle className="h-5 w-5 shrink-0 text-red-500" aria-hidden />
+                            <XCircle className="h-5 w-5 shrink-0 text-danger" aria-hidden />
                           )}
                         </div>
                         <div className="flex w-full flex-1 items-center justify-center">
@@ -453,7 +453,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                       onClick={() => setChoices((c) => ({ ...c, [q.id]: i }))}
                       aria-pressed={selected}
                       aria-label={`Pilihan ${LETTERS[i]}: ${opt.text}${selected ? " — dipilih" : ""}`}
-                      className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                      className={`focus-ring flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                         selected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/50"
                       } ${feedbackCls} ${showFeedback ? "cursor-default" : ""}`}
                     >
@@ -466,10 +466,10 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                       </span>
                       <span className="text-sm">{opt.text}</span>
                       {showFeedback && q.category !== "TKP" && i === q.answer && (
-                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />
+                        <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-success" />
                       )}
                       {showFeedback && q.category !== "TKP" && selected && i !== q.answer && (
-                        <XCircle className="ml-auto h-5 w-5 shrink-0 text-red-500" />
+                        <XCircle className="ml-auto h-5 w-5 shrink-0 text-danger" />
                       )}
                     </button>
                   );
@@ -501,7 +501,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
                       `/ai?q=${encodeURIComponent(q.id)}${chosen != null ? `&c=${chosen}` : ""}`,
                     )
                   }
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                  className="focus-ring mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                 >
                   <Sparkles className="h-3.5 w-3.5" aria-hidden />
                   Tanya lebih lanjut dengan AI

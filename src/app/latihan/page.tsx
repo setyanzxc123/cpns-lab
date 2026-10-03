@@ -160,7 +160,7 @@ export default function LatihanPage() {
                   setSubs([]);
                 }}
                 aria-pressed={cat === c}
-                className={`min-h-10 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`focus-ring min-h-10 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
                   cat === c ? "" : "bg-card"
                 }`}
                 style={
@@ -184,7 +184,7 @@ export default function LatihanPage() {
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {SUB_BY_CATEGORY[cat].map((s) => (
-                <label key={s} className="flex items-center gap-2 text-sm">
+                <label key={s} className="flex min-h-11 items-center gap-2 px-1 text-sm">
                   <Checkbox
                     checked={subs.includes(s)}
                     onCheckedChange={(v: boolean) =>

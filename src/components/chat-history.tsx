@@ -64,7 +64,7 @@ export function ChatHistoryList({
       <button
         type="button"
         onClick={onNew}
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
+        className="focus-ring flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors hover:bg-muted"
       >
         <SquarePen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         Percakapan baru
@@ -109,7 +109,7 @@ export function ChatHistoryList({
               type="button"
               aria-label={`Hapus percakapan ${s.title}`}
               onClick={() => onDelete(s.id)}
-              className="rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
+              className="focus-ring touch-target grid h-9 w-9 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
             </button>

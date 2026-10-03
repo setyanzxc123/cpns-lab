@@ -336,7 +336,7 @@ function AiChat() {
 
       <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex shrink-0 items-center justify-between gap-2 pb-1 md:hidden">
-          <h1 className="text-lg font-bold tracking-tight">Tutor AI</h1>
+          <h2 className="text-lg font-bold tracking-tight">Tutor AI</h2>
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger
               render={
@@ -410,7 +410,7 @@ function AiChat() {
                         key={s}
                         type="button"
                         onClick={() => sendMessage({ text: s })}
-                        className="rounded-full border px-3 py-1 text-xs transition-colors hover:bg-muted text-left"
+                        className="focus-ring flex min-h-11 items-center rounded-full border px-4 py-2 text-xs transition-colors hover:bg-muted text-left"
                       >
                         {s}
                       </button>
@@ -472,9 +472,9 @@ function AiChat() {
               {waitingForFirstToken && (
                 <Message from="assistant" className="max-w-full">
                   <div className="flex items-center gap-1.5 px-1 py-1">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+                    <span data-typing-dot className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                    <span data-typing-dot className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                    <span data-typing-dot className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
                     <span className="sr-only">Tutor sedang menulis…</span>
                   </div>
                 </Message>
@@ -513,7 +513,7 @@ function AiChat() {
                     status={status}
                     onStop={() => stop()}
                     aria-label="Kirim pesan"
-                    className="h-8 w-8 shrink-0 rounded-xl mb-1"
+                    className="touch-target h-9 w-9 shrink-0 rounded-xl mb-1"
                   />
                 </div>
               </PromptInput>
