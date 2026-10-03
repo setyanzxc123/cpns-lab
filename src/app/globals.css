@@ -127,3 +127,11 @@ body {
 body:has(.ai-page) footer {
   display: none;
 }
+
+/* Tailwind v4 menghapus cursor: pointer bawaan button di preflight. */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+[role="checkbox"],
+label:has([role="checkbox"], input[type="checkbox"]) {
+  cursor: pointer;
+}
