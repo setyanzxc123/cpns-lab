@@ -357,9 +357,15 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
+function normalizeMath(text: string): string {
+  return text.replace(/\\frac\s*\{/g, "\\dfrac{");
+}
+
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => {
+  ({ className, children, ...props }: MessageResponseProps) => {
     const plugins = useStreamdownPlugins();
+    const content =
+      typeof children === "string" ? normalizeMath(children) : children;
     return (
       <Streamdown
         className={cn(
@@ -372,7 +378,9 @@ export const MessageResponse = memo(
         )}
         plugins={plugins}
         {...props}
-      />
+      >
+        {content}
+      </Streamdown>
     );
   },
   (prevProps, nextProps) =>
