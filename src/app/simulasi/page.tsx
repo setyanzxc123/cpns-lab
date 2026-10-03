@@ -2,15 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ExamRunner } from "@/components/exam-runner";
+import { ResumeExamBanner } from "@/components/resume-exam-banner";
 import { ResultView } from "@/components/result-view";
 import { loadBank } from "@/data/bank";
 import type { Category, ExamConfig, Question, SessionResult } from "@/lib/types";
+import { localStore } from "@/lib/storage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { AlertTriangle, RotateCcw, Home } from "lucide-react";
 
 // Paket tunggal format resmi CAT BKN: SKD 110 soal dalam 405 menit.
+const LAST_RESULT_KEY = "cpns.lastResult";
+
+function persistLastResult(r: SessionResult) {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(LAST_RESULT_KEY, JSON.stringify(r));
+  }
+}
+
 const BKN_CONFIG = {
   title: "Simulasi Mandiri (format BKN)",
   counts: { TWK: 30, TIU: 35, TKP: 40 } as Record<Category, number>,
@@ -29,10 +39,24 @@ export default function SimulasiPage() {
       void loadBank().then(setBank);
     };
     window.addEventListener("cpns:bank-updated", onBankUpdated);
+
+    if (typeof window !== "undefined" && !localStore.getRunning()) {
+      const raw = window.sessionStorage.getItem(LAST_RESULT_KEY);
+      if (raw) {
+        try {
+          setResult(JSON.parse(raw) as SessionResult);
+          setPhase("result");
+        } catch {
+          window.sessionStorage.removeItem(LAST_RESULT_KEY);
+        }
+      }
+    }
+
     return () => window.removeEventListener("cpns:bank-updated", onBankUpdated);
   }, []);
 
   const startExam = (c: ExamConfig) => {
+    if (typeof window !== "undefined") window.sessionStorage.removeItem(LAST_RESULT_KEY);
     setConfig(c);
     setResult(null);
     setPhase("exam");
@@ -55,6 +79,7 @@ export default function SimulasiPage() {
         bank={bank}
         config={config}
         onFinished={(r) => {
+          persistLastResult(r);
           setResult(r);
           setPhase("result");
         }}
@@ -75,7 +100,13 @@ export default function SimulasiPage() {
           >
             <RotateCcw className="h-4 w-4" /> Ulangi dengan paket sama
           </Button>
-          <Button variant="outline" onClick={() => setPhase("config")}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (typeof window !== "undefined") window.sessionStorage.removeItem(LAST_RESULT_KEY);
+              setPhase("config");
+            }}
+          >
             Kembali
           </Button>
           <Link href="/" className={buttonVariants({ variant: "outline" })}>
@@ -95,6 +126,12 @@ export default function SimulasiPage() {
           Navigasi ala CAT BKN — timer aktif sejak sesi dimulai, jawaban tersimpan otomatis.
         </p>
       </div>
+
+      <ResumeExamBanner
+        mode="simulasi"
+        ready={bank.length > 0}
+        onResume={(c) => startExam(c)}
+      />
 
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">

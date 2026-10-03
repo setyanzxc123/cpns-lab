@@ -244,6 +244,9 @@ export interface ExamConfig {
 export interface RunningExam {
   config: ExamConfig;
   questionIds: string[];
+  /** Permutasi opsi per soal dari hasil acakan — wajib agar jawaban
+   *  tersimpan tetap menunjuk opsi yang sama setelah dipulihkan. */
+  optionOrders?: Record<string, number[]>;
   choices: Record<string, number | null>;
   flags: Record<string, boolean>;
   startedAt: number;

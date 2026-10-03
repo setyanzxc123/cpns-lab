@@ -8,6 +8,8 @@ import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
 import type { Question } from "@/lib/types";
 import type { ChatSession } from "@/lib/storage";
+import { localStore } from "@/lib/storage";
+import type { RunningExam } from "@/lib/types";
 import { getRepo } from "@/lib/repository";
 import { useSmoothText } from "@/hooks/use-smooth-text";
 import { loadBank } from "@/data/bank";
@@ -119,12 +121,37 @@ function AiChat() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [runningExam, setRunningExam] = useState<{
+    exam: RunningExam;
+    remainingMin: number | null;
+  } | null>(null);
 
   useEffect(() => {
     getRepo()
       .then((r) => r.listChatSessions())
       .then(setSessions)
       .catch(() => {});
+  }, []);
+
+  // Ujian berjalan di halaman lain: tawarkan jalan kembali selama waktunya tersisa.
+  useEffect(() => {
+    const check = () => {
+      const saved = localStore.getRunning() as RunningExam | null;
+      const valid = saved && (!saved.endsAt || saved.endsAt > Date.now());
+      setRunningExam(
+        valid
+          ? {
+              exam: saved,
+              remainingMin: saved.endsAt
+                ? Math.max(1, Math.ceil((saved.endsAt - Date.now()) / 60000))
+                : null,
+            }
+          : null,
+      );
+    };
+    check();
+    const interval = window.setInterval(check, 30000);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -301,6 +328,20 @@ function AiChat() {
         </div>
 
         <div className="flex shrink-0 flex-col gap-1.5 pb-2">
+          {runningExam && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-300/60 bg-blue-50 px-3 py-2 text-xs dark:border-blue-900/50 dark:bg-blue-950/40">
+              <span className="truncate">
+                Ujian <span className="font-semibold">{runningExam.exam.config.title}</span> berjalan
+                {runningExam.remainingMin !== null && ` · sisa ±${runningExam.remainingMin} menit`}
+              </span>
+              <Link
+                href={runningExam.exam.config.mode === "simulasi" ? "/simulasi" : "/latihan"}
+                className="shrink-0 font-medium underline-offset-2 hover:underline"
+              >
+                Kembali
+              </Link>
+            </div>
+          )}
           {qid ? (
             <Link
               href="/latihan"

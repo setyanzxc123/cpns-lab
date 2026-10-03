@@ -34,6 +34,22 @@ interface Props {
   onAbort?: () => void;
 }
 
+/** Terapkan kembali permutasi opsi hasil acakan pada soal kanonik dari bank. */
+function applyOptionOrder(q: Question, order: number[]): Question {
+  if (order.length !== q.options.length || order.some((i) => i < 0 || i >= order.length)) {
+    return q;
+  }
+  const options = order.map((i) => q.options[i]);
+  if (q.category === "TKP" && q.points) {
+    const points = order.map((i) => q.points![i]);
+    return { ...q, options, points };
+  }
+  if (q.answer !== undefined) {
+    return { ...q, options, answer: order.indexOf(q.answer) };
+  }
+  return { ...q, options };
+}
+
 export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
   const router = useRouter();
   const aiOn = Boolean(process.env.NEXT_PUBLIC_HAS_GEMINI);
@@ -50,6 +66,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
   );
   const finishedRef = useRef(false);
   const persistedRef = useRef(false);
+  const optionOrdersRef = useRef<Record<string, number[]>>({});
   const questionEnteredAtRef = useRef<number>(0);
 
   useEffect(() => {
@@ -61,8 +78,14 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
       (!saved.endsAt || saved.endsAt > Date.now());
 
     if (canRestore) {
+      optionOrdersRef.current = saved.optionOrders ?? {};
       const qs = saved.questionIds
-        .map((id) => bank.find((q) => q.id === id))
+        .map((id) => {
+          const q = bank.find((b) => b.id === id);
+          if (!q) return null;
+          const order = saved.optionOrders?.[id];
+          return order ? applyOptionOrder(q, order) : q;
+        })
         .filter((q): q is Question => Boolean(q));
 
       if (qs.length === saved.questionIds.length && qs.length > 0) {
@@ -80,6 +103,16 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
     }
 
     const { questions: qs } = sampleQuestions(bank, config);
+    const orders: Record<string, number[]> = {};
+    for (const q of qs) {
+      const canonical = bank.find((b) => b.id === q.id);
+      if (!canonical) continue;
+      // shuffleOptions memindah referensi opsi tanpa menggandakan, sehingga
+      // permutasi bisa dibaca ulang dari posisi objek di bank.
+      const order = q.options.map((o) => canonical.options.indexOf(o));
+      if (order.length > 0 && order.every((i) => i >= 0)) orders[q.id] = order;
+    }
+    optionOrdersRef.current = orders;
     const now = Date.now();
     const newEndsAt = config.durationSec > 0 ? now + config.durationSec * 1000 : null;
     setStartedAt(now);
@@ -192,6 +225,7 @@ export function ExamRunner({ bank, config, onFinished, onAbort }: Props) {
     localStore.saveRunning({
       config,
       questionIds: questions.map((q) => q.id),
+      optionOrders: optionOrdersRef.current,
       choices,
       flags,
       startedAt,
