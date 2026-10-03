@@ -57,13 +57,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SiteHeader />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 has-[.ai-page]:max-w-none has-[.ai-page]:px-4 lg:has-[.ai-page]:px-6 has-[.ai-page]:py-2 sm:has-[.ai-page]:py-3 has-[.ai-page]:pb-2 has-[.ai-page]:h-[calc(100dvh_-_57px)] has-[.ai-page]:overflow-hidden">
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 has-[.ai-page]:max-w-none has-[.ai-page]:px-4 lg:has-[.ai-page]:px-6 has-[.ai-page]:py-2 sm:has-[.ai-page]:py-3 has-[.ai-page]:pb-2 has-[.ai-page]:overflow-hidden max-md:has-[.ai-page]:pb-[calc(3.5rem+env(safe-area-inset-bottom,_0px))]">
             <AuthGate>{children}</AuthGate>
           </main>
-          <footer
-            className="border-t py-4 text-center text-xs text-muted-foreground"
-            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
-          >
+          <footer className="border-t py-4 text-center text-xs text-muted-foreground pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pb-[calc(3.5rem+max(1rem,env(safe-area-inset-bottom)))]">
             CPNS Lab — alat belajar mandiri. Soal contoh, bukan soal resmi BKN.
           </footer>
           <Toaster />

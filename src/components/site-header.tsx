@@ -84,7 +84,8 @@ export function SiteHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <>
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div
         className={`mx-auto flex w-full items-center gap-2 px-4 py-2.5 ${
           pathname === "/ai" ? "max-w-none lg:px-6" : "max-w-6xl"
@@ -141,23 +142,30 @@ export function SiteHeader() {
           ) : null}
         </div>
       </div>
-      {/* nav mobile */}
-      <nav className="flex gap-1 overflow-x-auto border-t px-2 py-1 md:hidden">
+      </header>
+      {/* nav mobile: tab bar tetap di bawah layar, ala app native.
+          Di luar <header> karena backdrop-blur header menjadikannya
+          containing block yang merusak position: fixed. */}
+      <nav
+        aria-label="Navigasi utama"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)] md:hidden"
+      >
         {NAV.map((n) => (
           <Link
             key={n.href}
             href={n.href}
-            className={`flex min-h-11 shrink-0 items-center gap-1 rounded-md px-3 py-2 text-xs font-medium ${
+            aria-current={pathname === n.href ? "page" : undefined}
+            className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
               pathname === n.href
-                ? "bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300"
+                ? "text-blue-800 dark:text-blue-300"
                 : "text-muted-foreground"
             }`}
           >
-            <n.icon className="h-3.5 w-3.5" />
+            <n.icon className="h-5 w-5" aria-hidden />
             {n.label}
           </Link>
         ))}
       </nav>
-    </header>
+    </>
   );
 }
