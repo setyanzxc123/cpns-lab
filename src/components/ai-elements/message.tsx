@@ -13,9 +13,6 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
-import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
@@ -29,6 +26,41 @@ import {
   useState,
 } from "react";
 import { Streamdown } from "streamdown";
+
+// Plugin berat (shiki, katex, mermaid) dimuat hanya saat halaman chat
+// terbuka dan dibagikan ke semua pesan lewat promise module-level.
+type StreamdownPlugins = NonNullable<ComponentProps<typeof Streamdown>["plugins"]>;
+
+const basePlugins: StreamdownPlugins = { cjk };
+
+let heavyPluginsPromise: Promise<StreamdownPlugins> | null = null;
+function loadHeavyPlugins(): Promise<StreamdownPlugins> {
+  heavyPluginsPromise ??= Promise.all([
+    import("@streamdown/code"),
+    import("@streamdown/math"),
+    import("@streamdown/mermaid"),
+  ]).then(([code, math, mermaid]) => ({
+    ...basePlugins,
+    code: code.code,
+    math: math.math,
+    mermaid: mermaid.mermaid,
+  }));
+  return heavyPluginsPromise;
+}
+
+function useStreamdownPlugins(): StreamdownPlugins {
+  const [plugins, setPlugins] = useState<StreamdownPlugins>(basePlugins);
+  useEffect(() => {
+    let alive = true;
+    void loadHeavyPlugins().then((p) => {
+      if (alive) setPlugins(p);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return plugins;
+}
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -93,7 +125,7 @@ export const MessageAction = ({
   ...props
 }: MessageActionProps) => {
   const button = (
-    <Button size={size} type="button" variant={variant} {...props}>
+    <Button size={size} type="button" variant={variant} className="touch-target" {...props}>
       {children}
       <span className="sr-only">{label || tooltip}</span>
     </Button>
@@ -325,23 +357,24 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
-const streamdownPlugins = { cjk, code, math, mermaid };
-
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
-    <Streamdown
-      className={cn(
-        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        "[&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
-        "[&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_h3]:mt-3 [&_h3]:mb-1",
-        "[&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_li>p]:my-0",
-        "[&_pre]:my-3 [&_pre]:rounded-lg",
-        className
-      )}
-      plugins={streamdownPlugins}
-      {...props}
-    />
-  ),
+  ({ className, ...props }: MessageResponseProps) => {
+    const plugins = useStreamdownPlugins();
+    return (
+      <Streamdown
+        className={cn(
+          "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+          "[&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
+          "[&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_h3]:mt-3 [&_h3]:mb-1",
+          "[&_ul]:my-2 [&_ol]:my-2 [&_li]:my-0.5 [&_li>p]:my-0",
+          "[&_pre]:my-3 [&_pre]:rounded-lg",
+          className
+        )}
+        plugins={plugins}
+        {...props}
+      />
+    );
+  },
   (prevProps, nextProps) =>
     prevProps.children === nextProps.children &&
     nextProps.isAnimating === prevProps.isAnimating

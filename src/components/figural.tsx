@@ -4,6 +4,7 @@
 // Mendukung Raven's Progressive Matrices, Cattell, WAIS Matrix Reasoning.
 // Ruang koordinat standar satu sel: 100x100.
 
+import Image from "next/image";
 import React from "react";
 import type { Fill, Glyph, OptionVisual, Shape, VisualSpec } from "@/lib/types";
 
@@ -434,13 +435,13 @@ function Cell({
 export function VisualPanel({ spec }: { spec: VisualSpec }) {
   if (spec.kind === "image") {
     return (
-      <div className="flex justify-center p-2">
-        <img
+      <div className="relative flex h-72 w-full items-center justify-center p-2">
+        <Image
           src={spec.src}
           alt={spec.alt ?? "Stimulus Soal Figural"}
-          loading="lazy"
-          decoding="async"
-          className="max-h-72 w-auto max-w-full rounded-lg border bg-white p-2 shadow-sm object-contain"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          className="rounded-lg border bg-white p-2 shadow-sm object-contain"
         />
       </div>
     );
@@ -521,13 +522,15 @@ export function GlyphPanelOption({ glyph }: { glyph: OptionVisual }) {
   if ("kind" in glyph && glyph.kind === "image") {
     return (
       <div className="flex w-full items-center justify-center py-1">
-        <img
-          src={glyph.src}
-          alt="Pilihan visual"
-          loading="lazy"
-          decoding="async"
-          className="h-28 sm:h-36 md:h-40 w-auto max-w-full rounded-md border bg-white p-1.5 object-contain shadow-xs transition-transform group-hover:scale-105"
-        />
+        <div className="relative h-28 w-full sm:h-36 md:h-40">
+          <Image
+            src={glyph.src}
+            alt="Pilihan visual"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+            className="rounded-md border bg-white p-1.5 object-contain shadow-xs"
+          />
+        </div>
       </div>
     );
   }
