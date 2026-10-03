@@ -3,42 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { ExamRunner } from "@/components/exam-runner";
 import { ResultView } from "@/components/result-view";
-import { loadBank, CATEGORY_INFO } from "@/data/bank";
+import { loadBank } from "@/data/bank";
 import type { Category, ExamConfig, Question, SessionResult } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import { AlertTriangle, RotateCcw, Home } from "lucide-react";
 
-const PRESETS: { name: string; desc: string; counts: Record<Category, number>; minutes: number }[] = [
-  {
-    name: "Simulasi Mandiri (format BKN)",
-    desc: "TWK 30 · TIU 35 · TKP 40 — 405 menit",
-    counts: { TWK: 30, TIU: 35, TKP: 40 },
-    minutes: 405,
-  },
-  {
-    name: "Setengah Set",
-    desc: "TWK 15 · TIU 17 · TKP 20 — 200 menit",
-    counts: { TWK: 15, TIU: 17, TKP: 20 },
-    minutes: 200,
-  },
-  {
-    name: "Kuis Cepat",
-    desc: "TWK 10 · TIU 10 · TKP 10 — 90 menit",
-    counts: { TWK: 10, TIU: 10, TKP: 10 },
-    minutes: 90,
-  },
-];
+// Paket tunggal format resmi CAT BKN: SKD 110 soal dalam 405 menit.
+const BKN_CONFIG = {
+  title: "Simulasi Mandiri (format BKN)",
+  counts: { TWK: 30, TIU: 35, TKP: 40 } as Record<Category, number>,
+  minutes: 405,
+};
 
 export default function SimulasiPage() {
   const [bank, setBank] = useState<Question[]>([]);
   const [phase, setPhase] = useState<"config" | "exam" | "result">("config");
   const [config, setConfig] = useState<ExamConfig | null>(null);
   const [result, setResult] = useState<SessionResult | null>(null);
-  const [counts, setCounts] = useState<Record<Category, number>>({ TWK: 10, TIU: 10, TKP: 10 });
-  const [minutes, setMinutes] = useState(90);
 
   useEffect(() => {
     loadBank().then(setBank);
@@ -93,7 +76,7 @@ export default function SimulasiPage() {
             <RotateCcw className="h-4 w-4" /> Ulangi dengan paket sama
           </Button>
           <Button variant="outline" onClick={() => setPhase("config")}>
-            Ganti paket
+            Kembali
           </Button>
           <Link href="/" className={buttonVariants({ variant: "outline" })}>
             <Home className="h-4 w-4" /> Beranda
@@ -114,81 +97,26 @@ export default function SimulasiPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {PRESETS.map((p) => (
-          <Card key={p.name} className="flex flex-col">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{p.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="mt-auto space-y-2">
-              <p className="text-xs text-muted-foreground">{p.desc}</p>
-              <Button size="sm" className="w-full" onClick={() => startExam({
-                mode: "simulasi",
-                title: p.name,
-                counts: p.counts,
-                durationSec: p.minutes * 60,
-              })}>
-                Mulai
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Paket Kustom</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            {(["TWK", "TIU", "TKP"] as Category[]).map((cat) => (
-              <div key={cat}>
-                <label
-                  htmlFor={`jumlah-${cat.toLowerCase()}`}
-                  className="mb-1 block text-xs font-medium"
-                  style={{ color: CATEGORY_INFO[cat].color }}
-                >
-                  {cat}
-                </label>
-                <Input
-                  id={`jumlah-${cat.toLowerCase()}`}
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={counts[cat]}
-                  onChange={(e) =>
-                    setCounts((c) => ({ ...c, [cat]: Math.max(0, Number(e.target.value) || 0) }))
-                  }
-                />
-              </div>
-            ))}
-          </div>
-          <div className="max-w-48">
-            <label
-              htmlFor="durasi-menit"
-              className="mb-1 block text-xs font-medium text-muted-foreground"
-            >
-              Durasi (menit)
-            </label>
-            <Input
-              id="durasi-menit"
-              type="number"
-              min={1}
-              value={minutes}
-              onChange={(e) => setMinutes(Math.max(1, Number(e.target.value) || 1))}
-            />
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <div>
+            <p className="font-semibold">{BKN_CONFIG.title}</p>
+            <p className="text-xs text-muted-foreground">
+              TWK 30 · TIU 35 · TKP 40 — {BKN_CONFIG.minutes} menit
+            </p>
           </div>
           <Button
+            size="lg"
             onClick={() =>
               startExam({
                 mode: "simulasi",
-                title: "Simulasi Kustom",
-                counts: { ...counts },
-                durationSec: minutes * 60,
+                title: BKN_CONFIG.title,
+                counts: BKN_CONFIG.counts,
+                durationSec: BKN_CONFIG.minutes * 60,
               })
             }
           >
-            Mulai Simulasi Kustom
+            Mulai Simulasi
           </Button>
         </CardContent>
       </Card>
