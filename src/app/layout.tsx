@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { SiteHeader } from "@/components/site-header";
 import { AuthGate } from "@/components/auth-gate";
 import { ThemeProvider } from "@/components/theme-provider";
+import "katex/dist/katex.min.css";
+import "streamdown/styles.css";
 import "./globals.css";
 
 const geistSans = Geist({

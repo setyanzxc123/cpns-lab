@@ -42,7 +42,7 @@ function loadHeavyPlugins(): Promise<StreamdownPlugins> {
   ]).then(([code, math, mermaid]) => ({
     ...basePlugins,
     code: code.code,
-    math: math.math,
+    math: math.createMathPlugin({ singleDollarTextMath: true }),
     mermaid: mermaid.mermaid,
   }));
   return heavyPluginsPromise;
