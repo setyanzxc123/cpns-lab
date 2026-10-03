@@ -6,11 +6,10 @@ import { loadBank, CATEGORY_INFO } from "@/data/bank";
 import { getRepo } from "@/lib/repository";
 import { deriveProgress, subTrend, weeklyAccuracy } from "@/lib/progress";
 import type { Category, Question, SessionResult, SubCategory } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { BarChart3, Bot, Loader2, Sparkles, Trash2, Repeat } from "lucide-react";
+import { Bot, Loader2, Sparkles, Trash2, Repeat } from "lucide-react";
 
 export default function StatistikPage() {
   const [results, setResults] = useState<SessionResult[]>([]);
@@ -32,7 +31,7 @@ export default function StatistikPage() {
     })();
   }, []);
 
-  // Agregat akurasi per subkategori dari semua riwayat
+  // Akumulasi semua waktu per sub — pelengkap angka berbobot di panel kemampuan.
   const subStats = useMemo(() => {
     const byId = new Map(bank.map((q) => [q.id, q]));
     const stats = new Map<SubCategory, { correct: number; total: number; category: Category }>();
@@ -57,6 +56,11 @@ export default function StatistikPage() {
   const progress = useMemo(
     () => (bank.length > 0 ? deriveProgress(results, bank) : null),
     [results, bank],
+  );
+
+  const mastery = useMemo(
+    () => (progress ? [...progress.subMastery].sort((a, b) => a.acc - b.acc) : []),
+    [progress],
   );
 
   async function clearWrong() {
@@ -117,237 +121,206 @@ export default function StatistikPage() {
     }
   }
 
-  if (loading) return <p className="text-center text-muted-foreground">Memuat statistik…</p>;
+  if (loading) return <p className="text-center text-muted-foreground">Memuat progres…</p>;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <div>
+    <div className="mx-auto max-w-4xl space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <h1 className="text-2xl font-bold">Progres Belajar</h1>
-        <p className="text-sm text-muted-foreground">
-          Semakin sering berlatih, grafik ini yang menunjukkan area mana yang perlu diperkuat.
-        </p>
-      </div>
-
-      {progress?.focusSub && (
-        <p className="text-sm text-muted-foreground">
-          Fokus berikutnya:{" "}
+        {progress?.focusSub && (
           <Link
             href={`/latihan?cat=${progress.focusSub.category}&subs=${encodeURIComponent(progress.focusSub.sub)}`}
-            className="font-medium text-foreground underline-offset-2 hover:underline"
+            className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
           >
-            {progress.focusSub.sub} ({progress.focusSub.acc}%)
+            Fokus berikutnya: {progress.focusSub.sub} · {progress.focusSub.acc}%
           </Link>
-        </p>
-      )}
+        )}
+      </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Kemampuan Saat Ini</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Akurasi berbobot — hasil terbaru berpengaruh lebih besar daripada hasil lama.
+      {/* Panel kemampuan: bar tren per sesi + angka berbobot, terlemah di atas. */}
+      <section aria-labelledby="kemampuan-heading">
+        <div className="flex items-baseline justify-between gap-2 pb-2">
+          <h2 id="kemampuan-heading" className="text-sm font-semibold">
+            Kemampuan per sub-materi
+          </h2>
+          <p className="text-xs text-muted-foreground">Hasil terbaru lebih menentukan.</p>
+        </div>
+        {!progress || mastery.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Belum ada data. Kerjakan{" "}
+            <Link href="/latihan" className="text-blue-700 underline">
+              latihan
+            </Link>{" "}
+            atau{" "}
+            <Link href="/simulasi" className="text-blue-700 underline">
+              simulasi
+            </Link>{" "}
+            dulu.
           </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!progress || progress.subMastery.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Belum ada data. Kerjakan{" "}
-              <Link href="/latihan" className="text-blue-700 underline">
-                latihan
-              </Link>{" "}
-              atau{" "}
-              <Link href="/simulasi" className="text-blue-700 underline">
-                simulasi
-              </Link>{" "}
-              dulu.
-            </p>
-          ) : (
-            [...progress.subMastery]
-              .sort((a, b) => a.acc - b.acc)
-              .map((m) => (
-                <div key={m.sub}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium" style={{ color: CATEGORY_INFO[m.category].color }}>
-                      {m.sub}{" "}
-                      <span className="text-xs text-muted-foreground">({m.category})</span>
+        ) : (
+          <div className="divide-y rounded-xl border">
+            {mastery.map((m) => {
+              const trend = bank.length > 0 ? subTrend(results, bank, m.sub).slice(-12) : [];
+              const all = subStats.get(m.sub);
+              const allPct = all ? Math.round((all.correct / Math.max(1, all.total)) * 100) : null;
+              const isFocus = progress.focusSub?.sub === m.sub;
+              const row = (
+                <>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="truncate text-sm font-semibold"
+                        style={{ color: CATEGORY_INFO[m.category].color }}
+                      >
+                        {m.sub}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {m.category}
+                        {isFocus && " · fokus"}
+                      </span>
                     </span>
-                    <span className="text-muted-foreground">
-                      {m.acc}% · {m.attempts} jawaban
-                      {m.acc < 60 && <span className="ml-2 text-xs font-semibold text-red-600">perlu diperkuat</span>}
+                    <span
+                      className={`shrink-0 text-lg font-bold tabular-nums ${
+                        m.acc < 60 ? "text-red-600 dark:text-red-400" : ""
+                      }`}
+                    >
+                      {m.acc}%
                     </span>
                   </div>
-                  <Progress value={m.acc} />
-                </div>
-              ))
-          )}
-        </CardContent>
-      </Card>
-
-      {progress && progress.subMastery.some((m) => m.attempts > 0) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Tren per Sub-materi</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Akurasi tiap sesi, lama ke baru. Arahkan kursor untuk detail.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {progress.subMastery
-              .filter((m) => m.attempts > 0)
-              .sort((a, b) => a.acc - b.acc)
-              .map((m) => {
-                const trend = subTrend(results, bank, m.sub).slice(-12);
-                return (
-                  <div key={m.sub} className="flex items-center gap-3">
-                    <span
-                      className="w-40 shrink-0 truncate text-sm font-medium"
-                      style={{ color: CATEGORY_INFO[m.category].color }}
-                      title={`${m.sub} (${m.category})`}
-                    >
-                      {m.sub}
-                    </span>
-                    <div className="flex h-8 flex-1 items-end gap-1">
+                  <div className="mt-1.5 flex items-center gap-3">
+                    <div className="flex h-6 min-w-0 flex-1 items-end gap-[3px]">
                       {trend.map((t, i) => (
                         <div
                           key={i}
-                          className="w-1.5 rounded-sm"
+                          className="w-2.5 rounded-sm"
                           style={{
-                            height: `${Math.max(8, t.pct * 0.28)}px`,
-                            backgroundColor: `color-mix(in oklab, ${CATEGORY_INFO[m.category].color} ${Math.max(25, t.pct)}%, transparent)`,
+                            height: `${Math.max(10, t.pct * 0.22)}px`,
+                            backgroundColor: `color-mix(in oklab, ${CATEGORY_INFO[m.category].color} ${Math.max(30, t.pct)}%, transparent)`,
                           }}
                           title={`${t.label} — ${t.pct}%`}
                         />
                       ))}
                     </div>
-                    <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
-                      {trend[trend.length - 1]?.pct ?? 0}%
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {m.attempts} jawaban
+                      {allPct !== null && ` · akumulasi ${allPct}%`}
                     </span>
                   </div>
-                );
-              })}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BarChart3 className="h-4 w-4" /> Akumulasi Semua Waktu
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {subStats.size === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Belum ada data. Kerjakan{" "}
-              <Link href="/latihan" className="text-blue-700 underline">
-                latihan
-              </Link>{" "}
-              atau{" "}
-              <Link href="/simulasi" className="text-blue-700 underline">
-                simulasi
-              </Link>{" "}
-              dulu.
-            </p>
-          )}
-          {[...subStats.entries()]
-            .sort((a, b) => a[1].correct / Math.max(1, a[1].total) - b[1].correct / Math.max(1, b[1].total))
-            .map(([sub, s]) => {
-              const pct = Math.round((s.correct / Math.max(1, s.total)) * 100);
-              return (
-                <div key={sub}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium" style={{ color: CATEGORY_INFO[s.category].color }}>
-                      {sub} <span className="text-xs text-muted-foreground">({s.category})</span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      {s.correct}/{s.total} · {pct}%
-                      {pct < 60 && <span className="ml-2 text-xs font-semibold text-red-600">perlu diperkuat</span>}
-                    </span>
-                  </div>
-                  <Progress value={pct} />
+                </>
+              );
+              return isFocus ? (
+                <Link
+                  key={m.sub}
+                  href={`/latihan?cat=${m.category}&subs=${encodeURIComponent(m.sub)}`}
+                  className="block px-4 py-3 transition-colors hover:bg-muted/60"
+                >
+                  {row}
+                </Link>
+              ) : (
+                <div key={m.sub} className="px-4 py-3">
+                  {row}
                 </div>
               );
             })}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </section>
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-4 w-4 text-purple-600" aria-hidden />
-            Analisis Skor &amp; Rencana Belajar
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Evaluasi otomatis berdasarkan akurasi jawaban dan kelemahan sub-materi TWK/TIU/TKP Anda.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden />
+            <div>
+              <p className="text-sm font-semibold">Analisis AI</p>
+              <p className="text-xs text-muted-foreground">
+                Rencana belajar 7 hari dari riwayat latihan Anda.
+              </p>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => void runAnalysis()} disabled={analyzing || !aiOn}>
+            <Button size="sm" onClick={() => void runAnalysis()} disabled={analyzing || !aiOn}>
               {analyzing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}
-              Analisis progres saya
+              Analisis sekarang
             </Button>
             {report && (
-              <Link href="/ai" className={buttonVariants({ variant: "outline" })}>
+              <Link href="/ai" className={buttonVariants({ variant: "outline", size: "sm" })}>
                 <Bot className="h-4 w-4 text-blue-600" aria-hidden />
-                Konsultasikan ke Tutor
+                Tanya Tutor
               </Link>
             )}
           </div>
-          {!aiOn && (
-            <p className="text-xs text-muted-foreground">
-              Analisis butuh <code className="rounded bg-muted px-1">GEMINI_API_KEY</code> — lihat README.
-            </p>
-          )}
-          {report && (
+        </CardContent>
+        {!aiOn && (
+          <p className="px-5 pb-4 text-xs text-muted-foreground">
+            Analisis butuh <code className="rounded bg-muted px-1">GEMINI_API_KEY</code> — lihat README.
+          </p>
+        )}
+        {report && (
+          <div className="px-5 pb-5">
             <div className="prose-sm max-w-none whitespace-pre-wrap rounded-lg border border-purple-200 bg-purple-50/70 p-4 text-sm leading-relaxed text-purple-950 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-200">
               {report}
             </div>
-          )}
-        </CardContent>
+          </div>
+        )}
       </Card>
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Basis Soal Salah</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {wrongCount > 0
-              ? `${wrongCount} soal pernah Anda jawab salah dan belum diulang dengan benar.`
-              : (<><span aria-hidden>🎉</span> Tidak ada soal salah yang tertunda.</>)}
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <p className="text-sm">
+            {wrongCount > 0 ? (
+              <>
+                <span className="font-semibold">{wrongCount} soal</span>{" "}
+                <span className="text-muted-foreground">menunggu untuk diulang.</span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">Tidak ada soal salah yang tertunda.</span>
+            )}
           </p>
           <div className="flex gap-2">
             {wrongCount > 0 ? (
-              <Link href="/latihan" className={buttonVariants({ variant: "outline" })}>
+              <Link href="/latihan" className={buttonVariants({ variant: "outline", size: "sm" })}>
                 <Repeat className="h-4 w-4" /> Latih ulang
               </Link>
             ) : (
-              <Button variant="outline" disabled>
+              <Button variant="outline" size="sm" disabled>
                 <Repeat className="h-4 w-4" /> Latih ulang
               </Button>
             )}
-            <Button variant="ghost" disabled={wrongCount === 0} onClick={clearWrong}>
-              <Trash2 className="h-4 w-4" /> Bersihkan daftar
+            <Button variant="ghost" size="sm" disabled={wrongCount === 0} onClick={clearWrong}>
+              <Trash2 className="h-4 w-4" /> Bersihkan
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Riwayat Pengerjaan ({results.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {results.length === 0 && <p className="text-sm text-muted-foreground">Belum ada riwayat.</p>}
+      <section aria-labelledby="riwayat-heading">
+        <div className="flex items-baseline justify-between gap-2 pb-2">
+          <h2 id="riwayat-heading" className="text-sm font-semibold">
+            Riwayat Pengerjaan
+          </h2>
+          <span className="text-xs text-muted-foreground">{results.length} sesi</span>
+        </div>
+        <div className="divide-y rounded-xl border">
+          {results.length === 0 && (
+            <p className="px-4 py-3 text-sm text-muted-foreground">Belum ada riwayat.</p>
+          )}
           {results.map((r) => {
             const pct = Math.round((r.totalScore / Math.max(1, r.maxScore)) * 100);
             return (
-              <div
-                key={r.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{r.title}</p>
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 font-medium">
+                    <span className="truncate">{r.title}</span>
+                    {r.passingGradeSummary && (
+                      <Badge
+                        className={
+                          r.passed ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+                        }
+                      >
+                        {r.passed ? "Lulus PG" : "TMS"}
+                      </Badge>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(r.finishedAt).toLocaleString("id-ID", {
                       dateStyle: "medium",
@@ -356,30 +329,17 @@ export default function StatistikPage() {
                     · {Math.floor(r.durationSec / 60)} menit
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {r.passingGradeSummary && (
-                    <Badge
-                      className={
-                        r.passed
-                          ? "bg-emerald-600 text-white"
-                          : "bg-rose-600 text-white"
-                      }
-                    >
-                      {r.passed ? "Lulus PG" : "TMS"}
-                    </Badge>
-                  )}
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {pct}%
-                    {r.avgTimePerQuestionSec != null && ` · ${r.avgTimePerQuestionSec} dtk/soal`}
-                    {" · " +
-                      r.subScores.map((sc) => `${sc.category} ${sc.score}/${sc.maxScore}`).join(" · ")}
-                  </span>
+                <div className="text-right">
+                  <p className="font-semibold tabular-nums">{pct}%</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {r.subScores.map((sc) => `${sc.category} ${sc.score}/${sc.maxScore}`).join(" · ")}
+                  </p>
                 </div>
               </div>
             );
           })}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   );
 }

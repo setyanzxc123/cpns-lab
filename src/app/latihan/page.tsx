@@ -105,7 +105,7 @@ export default function LatihanPage() {
       <div>
         <h1 className="text-2xl font-bold">Latihan</h1>
         <p className="text-sm text-muted-foreground">
-          Jawab per kategori tanpa timer. Setiap jawaban langsung muncul kunci dan pembahasannya.
+          Tanpa timer — kunci dan pembahasan muncul langsung di setiap jawaban.
         </p>
       </div>
 
@@ -203,7 +203,7 @@ export default function LatihanPage() {
           <p className="text-sm text-muted-foreground">
             {wrongCount > 0
               ? `Anda memiliki ${wrongCount} soal yang pernah dijawab salah. Kerjakan ulang untuk menguasainya.`
-              : "Belum ada soal yang salah — kerjakan latihan dulu, soal yang salah otomatis terkumpul di sini."}
+              : "Belum ada — soal yang dijawab salah terkumpul otomatis di sini."}
           </p>
           <Button
             variant="outline"
