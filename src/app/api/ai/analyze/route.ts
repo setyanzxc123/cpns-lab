@@ -53,11 +53,19 @@ Bahas tren mingguan dan perbandingan kemampuan berbobot vs akumulasi dalam
 analisismu (mis. "naik/turun", "membaik", "perlu dipertahankan").
 Bahasa Indonesia, maksimal 450 kata, langsung ke isi.`;
 
-  const { text } = await generateText({
-    ...getGemini(),
+  const { text, finishReason } = await generateText({
+    ...getGemini("low"),
     prompt,
-    maxOutputTokens: 1200,
+    maxOutputTokens: 4096,
   });
+  console.log("[ai/analyze] finish reason:", finishReason);
 
-  return Response.json({ report: text });
+  return Response.json({
+    report:
+      finishReason === "length"
+        ? `${text}
+
+_Analisis terpotong karena batas token — coba lagi untuk hasil yang lebih ringkas._`
+        : text,
+  });
 }

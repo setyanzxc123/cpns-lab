@@ -27,8 +27,8 @@ const provider = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY ?
 
 /** Model Gemini + providerOptions thinking level — spread ke streamText/generateText.
  *  includeThoughts: ringkasan proses berpikir ikut distream (tampil di Reasoning). */
-export function getGemini() {
-  const thinking = parseThinkingConfig();
+export function getGemini(defaultThinking?: ThinkingLevel) {
+  const thinking = parseThinkingConfig() ?? (defaultThinking ? { thinkingLevel: defaultThinking } : undefined);
   const thinkingConfig = { includeThoughts: true, ...(thinking ?? {}) };
   return {
     model: provider(GEMINI_MODEL_ID),

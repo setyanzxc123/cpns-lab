@@ -1,4 +1,9 @@
-import { streamText } from "ai";
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  streamText,
+  toUIMessageStream,
+} from "ai";
 import { getGemini } from "@/lib/ai";
 
 export const maxDuration = 60;
@@ -39,17 +44,46 @@ export async function POST(req: Request) {
     };
   });
 
+  // Thinking "low": token proses berpikir dihitung ke dalam maxOutputTokens,
+  // jadi level tinggi dengan jatah kecil memotong jawaban.
   const result = streamText({
-    ...getGemini(),
+    ...getGemini("low"),
     system: SYSTEM,
     messages,
-    maxOutputTokens: 2048,
-    onError: ({ error }) => {
-      // Jangan diamkan error upstream (mis. 429 kuota harian habis)
+    maxOutputTokens: 8192,
+  });
+
+  // Peringatkan bila model berhenti karena jatah token habis — tanpa ini
+  // pemotongan tampak seperti jawaban normal yang berhenti mendadak.
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      writer.merge(
+        toUIMessageStream({
+          stream: result.fullStream,
+          sendStart: false,
+          sendFinish: false,
+          onError: (error) => {
+            // Jangan diamkan error upstream (mis. 429 kuota harian habis)
+            console.error("[ai/chat]", error);
+            return "Terjadi gangguan saat menghubungi AI.";
+          },
+        }),
+      );
+      const finishReason = await result.finishReason;
+      console.log("[ai/chat] finish reason:", finishReason);
+      if (finishReason === "length") {
+        writer.write({
+          type: "text-delta",
+          id: "truncation-note",
+          delta: "\n\n_Jawaban terpotong karena batas token. Ketik **lanjutkan** untuk melanjutkan._",
+        });
+      }
+    },
+    onError: (error) => {
       console.error("[ai/chat]", error);
+      return "Terjadi gangguan saat menghubungi AI.";
     },
   });
 
-  // Protokol UIMessage: mendukung part reasoning (ringkasan proses berpikir)
-  return result.toUIMessageStreamResponse();
+  return createUIMessageStreamResponse({ stream });
 }
