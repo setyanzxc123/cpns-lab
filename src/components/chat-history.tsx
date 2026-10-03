@@ -22,12 +22,14 @@ function formatWhen(ts: number): string {
 export function ChatHistoryList({
   sessions,
   activeId,
+  loading = false,
   onOpen,
   onDelete,
   onNew,
 }: {
   sessions: ChatSession[];
   activeId: string | null;
+  loading?: boolean;
   onOpen: (s: ChatSession) => void;
   onDelete: (id: string) => void;
   onNew: () => void;
@@ -67,10 +69,21 @@ export function ChatHistoryList({
         <SquarePen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         Percakapan baru
       </button>
-      {sessions.length === 0 && (
-        <p className="px-2 py-1 text-xs text-muted-foreground">
-          Belum ada riwayat percakapan.
-        </p>
+      {loading ? (
+        <div className="space-y-2 px-2 py-1" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="animate-pulse space-y-1.5">
+              <div className="h-3.5 w-3/4 rounded bg-muted" />
+              <div className="h-2.5 w-1/3 rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        sessions.length === 0 && (
+          <p className="px-2 py-1 text-xs text-muted-foreground">
+            Belum ada riwayat percakapan.
+          </p>
+        )
       )}
       <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
         {displayedSessions.map((s) => (

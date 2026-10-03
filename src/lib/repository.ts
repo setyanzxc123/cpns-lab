@@ -141,14 +141,20 @@ class SupabaseRepo implements Repository {
     } catch {
       // offline — pakai lokal saja
     }
+    // Sesi yang dihapus lokal tetap ditolak meski cloud hapusnya gagal/tersendiri.
+    const deleted = new Set(localStore.getDeletedChatIds());
     const byId = new Map<string, ChatSession>();
     for (const s of [...localStore.getChatSessions(), ...cloud]) {
-      if (s?.id) byId.set(s.id, s);
+      if (s?.id && !deleted.has(s.id)) byId.set(s.id, s);
     }
     return [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50);
   }
   async saveChatSession(s: ChatSession): Promise<ChatSession[]> {
     // Offline-first: selalu tulis salinan lokal, lalu upsert ke cloud saat online.
+    // Sesi yang dihapus tidak di-upsert — mencegah hidup ulang dari cloud.
+    if (localStore.getDeletedChatIds().includes(s.id)) {
+      return localStore.getChatSessions();
+    }
     const next = localStore.saveChatSession(s);
     try {
       const sb = createClient();
@@ -173,9 +179,11 @@ class SupabaseRepo implements Repository {
     try {
       const sb = createClient();
       await sb.from("chat_sessions").delete().eq("id", id);
+      // Cloud bersih — tombstone tak diperlukan lagi.
+      localStore.removeDeletedChatId(id);
     } catch {
-      // offline — lokal terhapus; baris cloud tersisa diabaikan saat merge
-      // (sesi tidak ada di lokal & cloud tetap muncul setelah list berikutnya)
+      // Offline: lokal + tombstone sudah menolak sesi ini; hapus cloud
+      // menyusul saat penghapusan diulang dengan koneksi yang ada.
     }
     return next;
   }

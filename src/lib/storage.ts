@@ -10,6 +10,7 @@ const K_WRONG = "cpns.wrong";
 const K_RUNNING = "cpns.runningExam";
 const K_EXPLAIN_CACHE = "cpns.aiExplains";
 const K_CHAT_SESSIONS = "cpns.chatSessions";
+const K_DELETED_CHATS = "cpns.deletedChatIds";
 
 /** Satu pesan riwayat chat — struktur longgar mengikuti UIMessage AI SDK. */
 export interface ChatSessionMessage {
@@ -100,10 +101,27 @@ export const localStore = {
   getAllAiExplanations(): Record<string, string> {
     return read<Record<string, string>>(K_EXPLAIN_CACHE, {});
   },
+  getDeletedChatIds(): string[] {
+    return read<string[]>(K_DELETED_CHATS, []);
+  },
+  addDeletedChatId(id: string) {
+    const ids = localStore.getDeletedChatIds();
+    if (!ids.includes(id)) {
+      write(K_DELETED_CHATS, [...ids.slice(-99), id]);
+    }
+  },
+  removeDeletedChatId(id: string) {
+    write(K_DELETED_CHATS, localStore.getDeletedChatIds().filter((x) => x !== id));
+  },
   getChatSessions(): ChatSession[] {
     return read<ChatSession[]>(K_CHAT_SESSIONS, []).sort((a, b) => b.updatedAt - a.updatedAt);
   },
   saveChatSession(session: ChatSession): ChatSession[] {
+    // Sesi yang baru dihapus tidak boleh dihidupkan ulang oleh auto-save
+    // yang kebetulan masih berjalan saat penghapusan.
+    if (localStore.getDeletedChatIds().includes(session.id)) {
+      return localStore.getChatSessions();
+    }
     const all = localStore.getChatSessions();
     const existing = all.find((s) => s.id === session.id);
     const merged: ChatSession = {
@@ -118,6 +136,7 @@ export const localStore = {
     return next;
   },
   deleteChatSession(id: string): ChatSession[] {
+    localStore.addDeletedChatId(id);
     const next = localStore.getChatSessions().filter((s) => s.id !== id);
     write(K_CHAT_SESSIONS, next);
     return next;
@@ -132,6 +151,7 @@ export const localStore = {
     window.localStorage.removeItem(K_RESULTS);
     window.localStorage.removeItem(K_WRONG);
     window.localStorage.removeItem(K_CHAT_SESSIONS);
+    window.localStorage.removeItem(K_DELETED_CHATS);
   },
   getLastSync(): string | null {
     if (typeof window === "undefined") return null;

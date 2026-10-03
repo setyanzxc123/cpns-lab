@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
@@ -119,6 +119,7 @@ function AiChat() {
 
   // Riwayat percakapan (Supabase saat login, localStorage saat tamu)
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [runningExam, setRunningExam] = useState<{
@@ -126,11 +127,16 @@ function AiChat() {
     remainingMin: number | null;
   } | null>(null);
 
+  // Guard: sesi yang dihapus tidak boleh ditulis ulang oleh auto-save
+  // yang kebetulan masih berjalan saat penghapusan.
+  const deletedIdsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     getRepo()
       .then((r) => r.listChatSessions())
       .then(setSessions)
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
   }, []);
 
   // Ujian berjalan di halaman lain: tawarkan jalan kembali selama waktunya tersisa.
@@ -208,11 +214,12 @@ function AiChat() {
     if ((status !== "ready" && status !== "error") || messages.length === 0) return;
     let cancelled = false;
     (async () => {
-      const signature = JSON.stringify(
-        messages.map((m) => ({ id: m.id, role: m.role, parts: m.parts })),
-      );
+      if (activeId && deletedIdsRef.current.has(activeId)) return;
+      const canon = (ms: Array<{ id: string; role: string; parts: unknown }>) =>
+        JSON.stringify(ms.map((m) => ({ id: m.id, role: m.role, parts: m.parts })));
+      const signature = canon(messages);
       const existing = sessions.find((s) => s.id === (activeId ?? ""));
-      if (existing && JSON.stringify(existing.messages) === signature) return;
+      if (existing && canon(existing.messages) === signature) return;
       const session: ChatSession = {
         id: activeId ?? `C-${Date.now()}`,
         title: deriveTitle(messages, context),
@@ -258,13 +265,20 @@ function AiChat() {
     setSheetOpen(false);
   }
 
-  async function deleteSession(id: string) {
-    setSessions(await (await getRepo()).deleteChatSession(id));
+  function deleteSession(id: string) {
+    // Optimistis: singkirkan dari UI dulu, hapus repo menyusul.
+    deletedIdsRef.current.add(id);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
     if (activeId === id) {
       setActiveId(null);
       setMessages([]);
       setContext(null);
+      setSeedQuestion(null);
     }
+    void (async () => {
+      const next = await (await getRepo()).deleteChatSession(id);
+      setSessions(next);
+    })();
   }
 
   // Indikator mengetik: tampil hanya saat belum ada teks maupun ringkasan berpikir
@@ -289,8 +303,9 @@ function AiChat() {
     <ChatHistoryList
       sessions={sessions}
       activeId={activeId}
+      loading={historyLoading}
       onOpen={openSession}
-      onDelete={(id) => void deleteSession(id)}
+      onDelete={deleteSession}
       onNew={newChat}
     />
   );
