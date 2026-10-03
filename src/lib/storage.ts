@@ -11,6 +11,7 @@ const K_RUNNING = "cpns.runningExam";
 const K_EXPLAIN_CACHE = "cpns.aiExplains";
 const K_CHAT_SESSIONS = "cpns.chatSessions";
 const K_DELETED_CHATS = "cpns.deletedChatIds";
+const K_AI_PREFS = "cpns.aiPrefs";
 
 /** Satu pesan riwayat chat — struktur longgar mengikuti UIMessage AI SDK. */
 export interface ChatSessionMessage {
@@ -160,6 +161,12 @@ export const localStore = {
   setLastSync(iso: string): void {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("cpns.lastSync", iso);
+  },
+  getAiPrefs(): Record<string, string> {
+    return read<Record<string, string>>(K_AI_PREFS, {});
+  },
+  saveAiPrefs(prefs: Record<string, string>): void {
+    write(K_AI_PREFS, prefs);
   },
 };
 

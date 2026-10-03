@@ -9,6 +9,16 @@ import type { UIMessage } from "ai";
 import type { Question } from "@/lib/types";
 import type { ChatSession } from "@/lib/storage";
 import { localStore } from "@/lib/storage";
+import {
+  AI_MODEL_OPTIONS,
+  AI_THINKING_OPTIONS,
+  DEFAULT_AI_MODEL_KEY,
+  DEFAULT_AI_THINKING_KEY,
+  aiThinkingLevelsFor,
+  resolveAiModelKey,
+  resolveAiThinkingKey,
+} from "@/lib/ai-options";
+import type { AiThinkingKey } from "@/lib/ai-options";
 import type { RunningExam } from "@/lib/types";
 import { getRepo } from "@/lib/repository";
 import { useSmoothText } from "@/hooks/use-smooth-text";
@@ -183,6 +193,37 @@ function AiChat() {
     };
   }, [qid]);
 
+  // Preferensi model AI: dipersist di localStorage dan dikirim di body tiap
+  // request (sendMessage/regenerate) agar route tervalidasi server-side.
+  const [modelKey, setModelKey] = useState<string>(DEFAULT_AI_MODEL_KEY);
+  const [thinkingKey, setThinkingKey] = useState<AiThinkingKey>(DEFAULT_AI_THINKING_KEY);
+
+  useEffect(() => {
+    const prefs = localStore.getAiPrefs();
+    const model = resolveAiModelKey(prefs.model);
+    const thinking = resolveAiThinkingKey(prefs.thinking);
+    if (model) setModelKey(model);
+    if (thinking) setThinkingKey(thinking);
+  }, []);
+
+  function updateModelPref(key: string) {
+    setModelKey(key);
+    // Bila level thinking saat ini tak didukung model baru, turunkan ke
+    // level terendah yang didukung (mis. minimal -> low di 3.8 Flash).
+    if (!aiThinkingLevelsFor(key).includes(thinkingKey)) {
+      const fallback = aiThinkingLevelsFor(key)[0];
+      setThinkingKey(fallback);
+      localStore.saveAiPrefs({ model: key, thinking: fallback });
+      return;
+    }
+    localStore.saveAiPrefs({ ...localStore.getAiPrefs(), model: key });
+  }
+
+  function updateThinkingPref(key: AiThinkingKey) {
+    setThinkingKey(key);
+    localStore.saveAiPrefs({ ...localStore.getAiPrefs(), thinking: key });
+  }
+
   // Transport dibuat sekali — instansiasi ulang tiap render memutus koneksi stream.
   // Protokol UIMessage: mendukung part reasoning dari server.
   const [transport] = useState(() => new DefaultChatTransport({ api: "/api/ai/chat" }));
@@ -260,6 +301,10 @@ function AiChat() {
       cancelled = true;
     };
   }, [messages, status, activeId, context, sessions, seededChatId]);
+
+  function aiPrefsBody() {
+    return { model: modelKey, thinking: thinkingKey };
+  }
 
   function newChat() {
     setActiveId(null);
@@ -401,7 +446,7 @@ function AiChat() {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => sendMessage({ text: s })}
+                        onClick={() => sendMessage({ text: s }, { body: aiPrefsBody() })}
                         className="focus-ring flex min-h-11 items-center rounded-full border px-4 py-2 text-xs transition-colors hover:bg-muted text-left"
                       >
                         {s}
@@ -450,7 +495,7 @@ function AiChat() {
                             <MessageAction
                               tooltip="Ulangi"
                               aria-label="Ulangi balasan terakhir"
-                              onClick={() => void regenerate()}
+                              onClick={() => void regenerate({ body: aiPrefsBody() })}
                             >
                               <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
                             </MessageAction>
@@ -487,11 +532,47 @@ function AiChat() {
                   Gagal: {error.message}. Pastikan GEMINI_API_KEY terpasang dan server berjalan.
                 </div>
               )}
+              {aiOn && (
+                <div className="mb-2 flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="hidden sm:inline">Model</span>
+                    <select
+                      value={modelKey}
+                      onChange={(e) => updateModelPref(e.target.value)}
+                      aria-label="Pilih model AI"
+                      className="h-8 rounded-lg border border-input bg-card px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                    >
+                      {AI_MODEL_OPTIONS.map((m) => (
+                        <option key={m.id} value={m.id} title={m.hint}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="hidden sm:inline">Thinking</span>
+                    <select
+                      value={thinkingKey}
+                      onChange={(e) => updateThinkingPref(e.target.value as AiThinkingKey)}
+                      aria-label="Pilih thinking level AI"
+                      className="h-8 rounded-lg border border-input bg-card px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                    >
+                      {AI_THINKING_OPTIONS.filter((t) =>
+                        aiThinkingLevelsFor(modelKey).includes(t.key),
+                      ).map((t) => (
+                        <option key={t.key} value={t.key} title={t.hint}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
               <PromptInput
                 onSubmit={({ text }) => {
                   const t = (text ?? "").trim();
                   if (!t) return;
-                  sendMessage({ text: t });
+                  sendMessage({ text: t }, { body: aiPrefsBody() });
                 }}
                 className="w-full rounded-2xl border border-input bg-card transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30"
               >

@@ -54,7 +54,7 @@ analisismu (mis. "naik/turun", "membaik", "perlu dipertahankan").
 Bahasa Indonesia, maksimal 450 kata, langsung ke isi.`;
 
   const { text, finishReason } = await generateText({
-    ...getGemini("low"),
+    ...getGemini({ defaultThinking: "low" }),
     prompt,
     maxOutputTokens: 4096,
   });
