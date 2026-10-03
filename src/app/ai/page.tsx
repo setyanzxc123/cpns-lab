@@ -374,14 +374,6 @@ function AiChat() {
               </Link>
             </div>
           )}
-          {qid ? (
-            <Link
-              href="/latihan"
-              className="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
-            >
-              ← Kembali ke latihan
-            </Link>
-          ) : null}
           {!aiOn && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
               Chat butuh <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50 dark:text-amber-200">GEMINI_API_KEY</code> — lihat README.
