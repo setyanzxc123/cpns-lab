@@ -127,6 +127,10 @@ function AiChat() {
     remainingMin: number | null;
   } | null>(null);
 
+  // Percakapan seed dari deep-link soal memakai id deterministik agar
+  // kunjungan ulang melanjutkan utas yang sama, bukan menduplikasi riwayat.
+  const seededChatId = context?.id ? `C-q-${context.id}` : null;
+
   // Guard: sesi yang dihapus tidak boleh ditulis ulang oleh auto-save
   // yang kebetulan masih berjalan saat penghapusan.
   const deletedIdsRef = useRef<Set<string>>(new Set());
@@ -184,9 +188,21 @@ function AiChat() {
   const [transport] = useState(() => new DefaultChatTransport({ api: "/api/ai/chat" }));
   const { messages, sendMessage, setMessages, status, error, stop, regenerate } = useChat({ transport });
 
-  // Seed percakapan baru dengan konteks soal dari deep-link (sekali)
+  // Deep-link soal: lanjutkan utas yang sudah ada bila pernah dibuat,
+  // baru kalau tidak, tanam seed percakapan baru (setelah riwayat termuat
+  // agar tidak menimpa utas lama yang belum sempat dibaca).
   useEffect(() => {
     if (!seedQuestion || messages.length > 0) return;
+    if (seededChatId) {
+      setActiveId(seededChatId);
+      if (historyLoading) return;
+      const existing = sessions.find((s) => s.id === seededChatId);
+      if (existing) {
+        setMessages(existing.messages as unknown as UIMessage[]);
+        setSeedQuestion(null);
+        return;
+      }
+    }
     setMessages([
       {
         id: "seed-question",
@@ -205,7 +221,7 @@ function AiChat() {
       },
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seedQuestion, choice, messages.length]);
+  }, [seedQuestion, choice, messages.length, sessions, historyLoading, seededChatId]);
 
   // Auto-save sesi: setiap stream selesai (bukan per chunk).
   // Membuka sesi lama tanpa pesan baru tidak menyimpan ulang agar urutan
@@ -214,14 +230,15 @@ function AiChat() {
     if ((status !== "ready" && status !== "error") || messages.length === 0) return;
     let cancelled = false;
     (async () => {
-      if (activeId && deletedIdsRef.current.has(activeId)) return;
+      const candidateId = activeId ?? seededChatId ?? `C-${Date.now()}`;
+      if (deletedIdsRef.current.has(candidateId)) return;
       const canon = (ms: Array<{ id: string; role: string; parts: unknown }>) =>
         JSON.stringify(ms.map((m) => ({ id: m.id, role: m.role, parts: m.parts })));
       const signature = canon(messages);
-      const existing = sessions.find((s) => s.id === (activeId ?? ""));
+      const existing = sessions.find((s) => s.id === candidateId);
       if (existing && canon(existing.messages) === signature) return;
       const session: ChatSession = {
-        id: activeId ?? `C-${Date.now()}`,
+        id: candidateId,
         title: deriveTitle(messages, context),
         createdAt: existing?.createdAt ?? Date.now(),
         updatedAt: Date.now(),
@@ -236,13 +253,13 @@ function AiChat() {
       const next = await (await getRepo()).saveChatSession(session);
       if (!cancelled) {
         setSessions(next);
-        if (activeId !== session.id) setActiveId(session.id);
+        if (activeId !== candidateId) setActiveId(candidateId);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [messages, status, activeId, context, sessions]);
+  }, [messages, status, activeId, context, sessions, seededChatId]);
 
   function newChat() {
     setActiveId(null);
