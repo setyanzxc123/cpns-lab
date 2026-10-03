@@ -51,6 +51,7 @@ async function signInGoogle() {
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>("loading");
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigured()) {
@@ -94,11 +95,19 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         </div>
         <button
           type="button"
-          onClick={() => void signInGoogle()}
-          className="inline-flex items-center gap-3 rounded-full border bg-card px-6 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"
+          disabled={signingIn}
+          onClick={() => {
+            setSigningIn(true);
+            void signInGoogle().finally(() => setSigningIn(false));
+          }}
+          className="inline-flex items-center gap-3 rounded-full border bg-card px-6 py-2.5 text-sm font-semibold shadow-sm transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-ring/50 hover:bg-muted hover:shadow-md active:translate-y-0 active:scale-[0.98] active:bg-muted/80 disabled:cursor-wait disabled:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <GoogleLogo className="h-5 w-5" />
-          Masuk dengan Google
+          {signingIn ? (
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+          ) : (
+            <GoogleLogo className="h-5 w-5" />
+          )}
+          {signingIn ? "Mengalihkan…" : "Masuk dengan Google"}
         </button>
       </div>
     );
