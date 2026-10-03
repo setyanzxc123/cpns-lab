@@ -181,7 +181,7 @@ export default function StatistikPage() {
                     </span>
                     <span
                       className={`shrink-0 text-lg font-bold tabular-nums ${
-                        m.acc < 60 ? "text-red-600 dark:text-red-400" : ""
+                        m.acc < 60 ? "text-danger" : ""
                       }`}
                     >
                       {m.acc}%
@@ -314,7 +314,7 @@ export default function StatistikPage() {
                     {r.passingGradeSummary && (
                       <Badge
                         className={
-                          r.passed ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+                          r.passed ? "bg-success text-success-foreground" : "bg-danger text-danger-foreground"
                         }
                       >
                         {r.passed ? "Lulus PG" : "TMS"}
