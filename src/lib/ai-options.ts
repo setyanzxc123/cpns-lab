@@ -29,6 +29,8 @@ export interface AiModelOption {
   label: string;
   hint: string;
   thinkingLevels: AiThinkingKey[];
+  /** Perkiraan kuota request harian free tier, reset tengah malam PT (08:00 UTC). */
+  dailyQuota: number;
 }
 
 export const AI_MODEL_OPTIONS: AiModelOption[] = [
@@ -37,30 +39,35 @@ export const AI_MODEL_OPTIONS: AiModelOption[] = [
     label: "3.8 Flash",
     hint: "Flash terbaru, paling cerdas untuk agentic dan tugas kompleks",
     thinkingLevels: ALL_THINKING.filter((k) => k !== "minimal"),
+    dailyQuota: 20,
   },
   {
     id: "gemini-3.7-flash",
     label: "3.7 Flash",
     hint: "Generasi sebelumnya untuk coding kompleks dan alur multi-langkah",
     thinkingLevels: ALL_THINKING.filter((k) => k !== "minimal"),
+    dailyQuota: 20,
   },
   {
     id: "gemini-3.6-flash",
     label: "3.6 Flash",
     hint: "Seimbang antara kecepatan dan kemampuan multimodal",
     thinkingLevels: ALL_THINKING,
+    dailyQuota: 20,
   },
   {
     id: "gemini-3.5-flash",
     label: "3.5 Flash",
     hint: "Generasi awal, performa dasar untuk beban rutin",
     thinkingLevels: ALL_THINKING,
+    dailyQuota: 20,
   },
   {
     id: "gemini-3.5-flash-lite",
     label: "3.5 Flash-Lite",
     hint: "Paling kilat dan hemat, cocok tanya jawab ringan",
     thinkingLevels: ALL_THINKING,
+    dailyQuota: 500,
   },
 ];
 

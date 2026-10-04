@@ -10,6 +10,7 @@ import type { Question, SessionResult } from "@/lib/types";
 import { CATEGORY_INFO } from "@/data/bank";
 import { formatTime } from "@/hooks/use-exam";
 import { localStore } from "@/lib/storage";
+import { recordAiRequest } from "@/lib/ai-quota";
 import { VisualPanel } from "@/components/figural";
 import { QuestionText } from "@/components/question-text";
 import { Badge } from "@/components/ui/badge";
@@ -434,6 +435,8 @@ function ReviewCard({
         setAiExplain(data.explanation);
         setFromCache(false);
         localStore.saveAiExplanation(q.id, choice, data.explanation);
+        // Kurangi kuota harian model yang dipakai server (perkiraan client).
+        if (typeof data.model === "string") void recordAiRequest(data.model);
       } else {
         setAiExplain(data.explanation ?? "AI tidak tersedia saat ini.");
       }

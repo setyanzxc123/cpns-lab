@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { getGemini } from "@/lib/ai";
+import { GEMINI_MODEL_ID, getGemini } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -86,7 +86,8 @@ Buat penjelasan maksimal 150 kata:
       maxOutputTokens: 600,
     });
 
-    return Response.json({ explanation: text });
+    // Model ikut dikirim agar client bisa mencatatnya ke kuota harian.
+    return Response.json({ explanation: text, model: GEMINI_MODEL_ID });
   } catch {
     return Response.json(
       { explanation: "Gagal memproses penjelasan dengan AI saat ini. Gunakan pembahasan resmi yang tertera." },

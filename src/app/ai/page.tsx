@@ -19,6 +19,8 @@ import {
   resolveAiThinkingKey,
 } from "@/lib/ai-options";
 import type { AiThinkingKey } from "@/lib/ai-options";
+import { refreshAllAiQuotaUsage, recordAiRequest } from "@/lib/ai-quota";
+import type { AiQuotaUsage } from "@/lib/ai-quota";
 import type { RunningExam } from "@/lib/types";
 import { getRepo } from "@/lib/repository";
 import { useSmoothText } from "@/hooks/use-smooth-text";
@@ -197,6 +199,8 @@ function AiChat() {
   // request (sendMessage/regenerate) agar route tervalidasi server-side.
   const [modelKey, setModelKey] = useState<string>(DEFAULT_AI_MODEL_KEY);
   const [thinkingKey, setThinkingKey] = useState<AiThinkingKey>(DEFAULT_AI_THINKING_KEY);
+  // Kuota semua model untuk dropdown: tabel Supabase saat login, lokal saat tamu.
+  const [quotaMap, setQuotaMap] = useState<Record<string, AiQuotaUsage> | null>(null);
 
   useEffect(() => {
     const prefs = localStore.getAiPrefs();
@@ -204,6 +208,16 @@ function AiChat() {
     const thinking = resolveAiThinkingKey(prefs.thinking);
     if (model) setModelKey(model);
     if (thinking) setThinkingKey(thinking);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    refreshAllAiQuotaUsage().then((map) => {
+      if (active) setQuotaMap(map);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   function updateModelPref(key: string) {
@@ -222,6 +236,13 @@ function AiChat() {
   function updateThinkingPref(key: AiThinkingKey) {
     setThinkingKey(key);
     localStore.saveAiPrefs({ ...localStore.getAiPrefs(), thinking: key });
+  }
+
+  // Perkiraan kuota: kurangi jatah model terpilih saat chat dikirim.
+  function countQuota() {
+    void recordAiRequest(modelKey).then((q) => {
+      setQuotaMap((prev) => ({ ...(prev ?? {}), [modelKey]: q }));
+    });
   }
 
   // Transport dibuat sekali — instansiasi ulang tiap render memutus koneksi stream.
@@ -361,6 +382,8 @@ function AiChat() {
     lastMessage?.role === "assistant" &&
     lastText.length === 0;
 
+  const quota = quotaMap?.[modelKey] ?? null;
+
   const historyList = (
     <ChatHistoryList
       sessions={sessions}
@@ -419,6 +442,17 @@ function AiChat() {
               </Link>
             </div>
           )}
+          {quota?.remaining === 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              Perkiraan kuota harian model ini sudah habis — request berikutnya
+              kemungkinan ditolak Google. Jatah ter-reset pukul{" "}
+              {new Date(quota.resetAt).toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}{" "}
+              (tengah malam PT), atau pilih model lain.
+            </div>
+          )}
           {!aiOn && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
               Chat butuh <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/50 dark:text-amber-200">GEMINI_API_KEY</code> — lihat README.
@@ -446,7 +480,10 @@ function AiChat() {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => sendMessage({ text: s }, { body: aiPrefsBody() })}
+                        onClick={() => {
+                          countQuota();
+                          void sendMessage({ text: s }, { body: aiPrefsBody() });
+                        }}
                         className="focus-ring flex min-h-11 items-center rounded-full border px-4 py-2 text-xs transition-colors hover:bg-muted text-left"
                       >
                         {s}
@@ -495,7 +532,10 @@ function AiChat() {
                             <MessageAction
                               tooltip="Ulangi"
                               aria-label="Ulangi balasan terakhir"
-                              onClick={() => void regenerate({ body: aiPrefsBody() })}
+                            onClick={() => {
+                              countQuota();
+                              void regenerate({ body: aiPrefsBody() });
+                            }}
                             >
                               <RefreshCcw className="h-3.5 w-3.5" aria-hidden />
                             </MessageAction>
@@ -542,11 +582,19 @@ function AiChat() {
                       aria-label="Pilih model AI"
                       className="h-8 rounded-lg border border-input bg-card px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                     >
-                      {AI_MODEL_OPTIONS.map((m) => (
-                        <option key={m.id} value={m.id} title={m.hint}>
-                          {m.label}
-                        </option>
-                      ))}
+                      {AI_MODEL_OPTIONS.map((m) => {
+                        const u = quotaMap?.[m.id];
+                        const count = u ? `${u.remaining}/${u.limit}` : `${m.dailyQuota}`;
+                        return (
+                          <option
+                            key={m.id}
+                            value={m.id}
+                            title={`${m.hint} — reset tengah malam PT (15.00 WITA)`}
+                          >
+                            {m.label} ({count} req)
+                          </option>
+                        );
+                      })}
                     </select>
                   </label>
                   <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -572,6 +620,7 @@ function AiChat() {
                 onSubmit={({ text }) => {
                   const t = (text ?? "").trim();
                   if (!t) return;
+                  countQuota();
                   sendMessage({ text: t }, { body: aiPrefsBody() });
                 }}
                 className="w-full rounded-2xl border border-input bg-card transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30"

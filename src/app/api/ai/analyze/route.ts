@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { getGemini } from "@/lib/ai";
+import { GEMINI_MODEL_ID, getGemini } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -60,7 +60,9 @@ Bahasa Indonesia, maksimal 450 kata, langsung ke isi.`;
   });
   console.log("[ai/analyze] finish reason:", finishReason);
 
+  // Model ikut dikirim agar client bisa mencatatnya ke kuota harian.
   return Response.json({
+    model: GEMINI_MODEL_ID,
     report:
       finishReason === "length"
         ? `${text}

@@ -271,3 +271,114 @@ create policy "Users can delete own chat sessions"
   on public.chat_sessions for delete
   to authenticated
   using (auth.uid() = user_id);
+
+-- =============================================================================
+-- 4. TABEL: ai_quota_usage (Perkiraan kuota request AI harian per model)
+-- Reset window mengikuti tengah malam PT (zona America/Los_Angeles, DST-aware).
+-- Limit harian di RPC harus sinkron dengan AI_MODEL_OPTIONS di src/lib/ai-options.ts.
+-- =============================================================================
+create table if not exists public.ai_quota_usage (
+  user_id uuid references auth.users(id) on delete cascade default auth.uid(),
+  model text not null,
+  window_reset_at timestamptz not null,
+  count int not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, model, window_reset_at)
+);
+
+drop trigger if exists tr_ai_quota_usage_user_id on public.ai_quota_usage;
+create trigger tr_ai_quota_usage_user_id
+  before insert on public.ai_quota_usage
+  for each row execute function public.handle_set_user_id();
+
+-- FUNCTION RPC: record_ai_usage — tambah satu pemakaian secara atomik dan
+-- kembalikan pemakaian window berjalan (used, limit, resetAt).
+create or replace function public.record_ai_usage(p_model text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_limit int;
+  v_used int;
+  v_reset timestamptz;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- Tengah malam PT berikutnya (Postgres menangani DST via nama zona).
+  v_reset := ((
+    (((now() AT TIME ZONE 'America/Los_Angeles')::date + 1))::timestamp
+  ) AT TIME ZONE 'America/Los_Angeles');
+
+  insert into public.ai_quota_usage (user_id, model, window_reset_at, count, updated_at)
+  values (v_uid, p_model, v_reset, 1, now())
+  on conflict (user_id, model, window_reset_at)
+  do update set count = public.ai_quota_usage.count + 1, updated_at = now();
+
+  select q.count into v_used
+  from public.ai_quota_usage q
+  where q.user_id = v_uid and q.model = p_model and q.window_reset_at = v_reset;
+
+  v_limit := case when p_model = 'gemini-3.5-flash-lite' then 500 else 20 end;
+
+  return jsonb_build_object('used', v_used, 'limit', v_limit, 'resetAt', v_reset);
+end;
+$$;
+
+-- FUNCTION RPC: get_all_ai_usage — baca pemakaian semua model pada window
+-- berjalan tanpa menambah (dipakai dropdown pemilih model).
+create or replace function public.get_all_ai_usage()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_reset timestamptz;
+  v_usage jsonb;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  v_reset := ((
+    (((now() AT TIME ZONE 'America/Los_Angeles')::date + 1))::timestamp
+  ) AT TIME ZONE 'America/Los_Angeles');
+
+  select coalesce(jsonb_object_agg(q.model, q.count), '{}'::jsonb)
+  into v_usage
+  from public.ai_quota_usage q
+  where q.user_id = v_uid and q.window_reset_at = v_reset;
+
+  return jsonb_build_object('resetAt', v_reset, 'usage', v_usage);
+end;
+$$;
+
+grant execute on function public.record_ai_usage(text) to authenticated;
+grant execute on function public.get_all_ai_usage() to authenticated;
+
+alter table public.ai_quota_usage enable row level security;
+
+drop policy if exists "Users can view own ai quota usage" on public.ai_quota_usage;
+create policy "Users can view own ai quota usage"
+  on public.ai_quota_usage for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert own ai quota usage" on public.ai_quota_usage;
+create policy "Users can insert own ai quota usage"
+  on public.ai_quota_usage for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update own ai quota usage" on public.ai_quota_usage;
+create policy "Users can update own ai quota usage"
+  on public.ai_quota_usage for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

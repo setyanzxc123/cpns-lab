@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { loadBank, CATEGORY_INFO } from "@/data/bank";
 import { getRepo } from "@/lib/repository";
+import { recordAiRequest } from "@/lib/ai-quota";
 import { deriveProgress, subTrend, weeklyAccuracy } from "@/lib/progress";
 import type { Category, Question, SessionResult, SubCategory } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
@@ -114,6 +115,8 @@ export default function StatistikPage() {
       });
       const data = await res.json();
       setReport(data.report ?? "Tidak ada hasil.");
+      // Kurangi kuota harian model yang dipakai server (perkiraan client).
+      if (res.ok && typeof data.model === "string") void recordAiRequest(data.model);
     } catch {
       setReport("Gagal menghubungi AI. Periksa koneksi atau GEMINI_API_KEY.");
     } finally {
