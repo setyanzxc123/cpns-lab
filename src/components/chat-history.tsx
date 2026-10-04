@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import { SquarePen, Trash2 } from "lucide-react";
 import type { ChatSession } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function getScreenCapacity(): number {
   if (typeof window === "undefined") return 8;
@@ -36,6 +45,9 @@ export function ChatHistoryList({
 }) {
   const [capacity, setCapacity] = useState(8);
   const [extraCount, setExtraCount] = useState(0);
+  // Konfirmasi hapus: delete bersifat permanen (soft delete tanpa undo),
+  // dan di perangkat sentuh tombol ini selalu tampak — rawan salah tekan.
+  const [pendingDelete, setPendingDelete] = useState<ChatSession | null>(null);
 
   useEffect(() => {
     setCapacity(getScreenCapacity());
@@ -108,8 +120,8 @@ export function ChatHistoryList({
             <button
               type="button"
               aria-label={`Hapus percakapan ${s.title}`}
-              onClick={() => onDelete(s.id)}
-              className="focus-ring touch-target grid h-9 w-9 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
+              onClick={() => setPendingDelete(s)}
+              className="focus-ring touch-target grid h-9 w-9 shrink-0 place-items-center rounded text-muted-foreground transition-opacity hover:text-destructive focus-visible:text-destructive md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
             </button>
@@ -125,6 +137,38 @@ export function ChatHistoryList({
           </button>
         )}
       </div>
+
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus percakapan ini?</DialogTitle>
+            <DialogDescription>
+              {pendingDelete
+                ? `"${pendingDelete.title}" akan dihapus dari riwayat. Tindakan ini tidak bisa dibatalkan.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDelete(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingDelete) onDelete(pendingDelete.id);
+                setPendingDelete(null);
+              }}
+            >
+              Ya, hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
