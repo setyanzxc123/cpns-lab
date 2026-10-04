@@ -126,18 +126,21 @@ class SupabaseRepo implements Repository {
       const sb = createClient();
       const { data } = await sb
         .from("chat_sessions")
-        .select("id, title, context_question_id, context_label, messages, created_at, updated_at")
+        .select("id, title, context_question_id, context_label, messages, created_at, updated_at, deleted_at")
         .order("updated_at", { ascending: false })
         .limit(50);
-      cloud = (data ?? []).map((row) => ({
-        id: row.id as string,
-        title: (row.title as string) || "Percakapan",
-        createdAt: Date.parse(row.created_at as string),
-        updatedAt: Date.parse(row.updated_at as string),
-        contextQuestionId: (row.context_question_id as string) ?? undefined,
-        contextLabel: (row.context_label as string) ?? undefined,
-        messages: (row.messages as ChatSession["messages"]) ?? [],
-      }));
+      // Sesi yang dihapus (soft delete) tidak ditampilkan.
+      cloud = (data ?? [])
+        .filter((row) => !row.deleted_at)
+        .map((row) => ({
+          id: row.id as string,
+          title: (row.title as string) || "Percakapan",
+          createdAt: Date.parse(row.created_at as string),
+          updatedAt: Date.parse(row.updated_at as string),
+          contextQuestionId: (row.context_question_id as string) ?? undefined,
+          contextLabel: (row.context_label as string) ?? undefined,
+          messages: (row.messages as ChatSession["messages"]) ?? [],
+        }));
     } catch {
       // offline — pakai lokal saja
     }
@@ -153,11 +156,22 @@ class SupabaseRepo implements Repository {
     // Offline-first: selalu tulis salinan lokal, lalu upsert ke cloud saat online.
     // Sesi yang dihapus tidak di-upsert — mencegah hidup ulang dari cloud.
     if (localStore.getDeletedChatIds().includes(s.id)) {
-      return localStore.getChatSessions();
+      return this.listChatSessions();
     }
-    const next = localStore.saveChatSession(s);
+    localStore.saveChatSession(s);
     try {
       const sb = createClient();
+      // Sesi yang dihapus dari perangkat lain (soft delete) tidak boleh
+      // di-upsert ulang — ikuti penanda hapus cloud, bukan hidupkan kembali.
+      const { data: row } = await sb
+        .from("chat_sessions")
+        .select("deleted_at")
+        .eq("id", s.id)
+        .maybeSingle();
+      if (row?.deleted_at) {
+        localStore.deleteChatSession(s.id);
+        return this.listChatSessions();
+      }
       await sb.from("chat_sessions").upsert(
         {
           id: s.id,
@@ -172,20 +186,24 @@ class SupabaseRepo implements Repository {
     } catch {
       // offline — salinan lokal ada; akan tersinkron saat save berikutnya online
     }
-    return next;
+    return this.listChatSessions();
   }
   async deleteChatSession(id: string): Promise<ChatSession[]> {
-    const next = localStore.deleteChatSession(id);
+    // Soft delete di kedua sisi: tombstone lokal + deleted_at di cloud.
+    // Tombstone dipertahankan (tidak dibuang saat cloud sukses) supaya
+    // auto-save in-flight tidak bisa meng-upsert ulang sesi ini.
+    localStore.deleteChatSession(id);
     try {
       const sb = createClient();
-      await sb.from("chat_sessions").delete().eq("id", id);
-      // Cloud bersih — tombstone tak diperlukan lagi.
-      localStore.removeDeletedChatId(id);
+      await sb
+        .from("chat_sessions")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id);
     } catch {
-      // Offline: lokal + tombstone sudah menolak sesi ini; hapus cloud
+      // Offline: lokal + tombstone sudah menolak sesi ini; soft delete cloud
       // menyusul saat penghapusan diulang dengan koneksi yang ada.
     }
-    return next;
+    return this.listChatSessions();
   }
 }
 

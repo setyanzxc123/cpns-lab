@@ -293,7 +293,10 @@ function AiChat() {
     let cancelled = false;
     (async () => {
       const candidateId = activeId ?? seededChatId ?? `C-${Date.now()}`;
+      // Guard dobel: ref in-memory + tombstone localStorage (tetap berlaku
+      // setelah reload, mengimbangi auto-save yang masih in-flight).
       if (deletedIdsRef.current.has(candidateId)) return;
+      if (localStore.getDeletedChatIds().includes(candidateId)) return;
       const canon = (ms: Array<{ id: string; role: string; parts: unknown }>) =>
         JSON.stringify(ms.map((m) => ({ id: m.id, role: m.role, parts: m.parts })));
       const signature = canon(messages);

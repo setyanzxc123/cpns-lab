@@ -108,7 +108,7 @@ export const localStore = {
   addDeletedChatId(id: string) {
     const ids = localStore.getDeletedChatIds();
     if (!ids.includes(id)) {
-      write(K_DELETED_CHATS, [...ids.slice(-99), id]);
+      write(K_DELETED_CHATS, [...ids.slice(-499), id]);
     }
   },
   removeDeletedChatId(id: string) {

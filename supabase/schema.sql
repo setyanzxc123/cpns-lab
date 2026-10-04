@@ -234,8 +234,14 @@ create table if not exists public.chat_sessions (
   context_label text,                 -- label ringkas konteks, mis. "TIU — Pola Bilangan"
   messages jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- Soft delete: penanda hapus terpropagasi antar perangkat, mencegah
+  -- auto-save di perangkat lain menghidupkan kembali sesi yang dihapus.
+  deleted_at timestamptz
 );
+
+-- Untuk instalasi lama yang tabelnya sudah ada sebelum kolom deleted_at.
+alter table public.chat_sessions add column if not exists deleted_at timestamptz;
 
 create index if not exists idx_chat_sessions_user_updated
   on public.chat_sessions (user_id, updated_at desc);
